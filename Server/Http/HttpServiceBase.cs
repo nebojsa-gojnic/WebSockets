@@ -9,15 +9,26 @@ namespace WebSockets
 
         protected MimeTypes _mimeTypes ;
 	    protected Stream _stream ;
+		protected string _enconding ;
         protected string _path ;
 		protected string _webRoot ;
         protected IWebSocketLogger _logger ;
+		protected StringBuilder _stringBuilder ;
+		protected StringBuilder getStringBuilder ()
+		{
+			if ( _stringBuilder == null ) _stringBuilder = new StringBuilder () ;
+			return _stringBuilder ;
+		}
+		public StringBuilder stringBuilder 
+		{
+			get => getStringBuilder () ;
+		}
 		public abstract bool Respond ( out string responseHeader , out Exception codeError ) ;
 		public abstract void Dispose () ;
 		public string RespondFailure ( string header , string errorMessage )
 		{
             HttpHelper.WriteHttpHeader ( header  , _stream ) ;
-            _logger?.Warning ( this.GetType(), "errorMessage" ) ;
+            _logger?.Warning ( GetType() , "errorMessage" ) ;
 			return header  ;
 		}
         public string RespondMimeTypeFailure ( string fileName )
@@ -45,22 +56,41 @@ namespace WebSockets
 		}
 		public string RespondChunkedSuccess ( string contentType )
         {
-            string header = "HTTP/1.1 200 OK" + Environment.NewLine +
-                              "Content-Type: " + contentType + Environment.NewLine +
-                              "Transfer-Encoding: chunked" + Environment.NewLine +
-                              "Connection: keep-alive" ;
-            HttpHelper.WriteHttpHeader ( header , _stream ) ;
+			return RespondChunkedSuccess ( contentType , "utf-8" ) ;
+        }
+		public string RespondChunkedSuccess ( string contentType , string charset )
+        {
+			stringBuilder.Clear () ;
+			stringBuilder.Append ( "HTTP/1.1 200 OK\r\nContent-Type: " ) ;
+			stringBuilder.Append ( contentType ) ;
+			stringBuilder.Append ( "; charset=" ) ;
+			stringBuilder.Append ( charset ) ;
+			stringBuilder.Append ( "\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n" ) ;
+			string header = stringBuilder.ToString () ;
+            Byte[] bytes = Encoding.ASCII.GetBytes ( header );
+            _stream.Write ( bytes , 0 , bytes.Length ) ;
 			return header ;
         }
 		public string RespondSuccess ( string contentType , long contentLength )
         {
-            string header = "HTTP/1.1 200 OK" + Environment.NewLine +
-                              "Content-Type: " + contentType + Environment.NewLine +
-                              "Content-Length: " + contentLength + Environment.NewLine +
-                              "Connection: close";
-            HttpHelper.WriteHttpHeader ( header , _stream ) ;
-			return header ;
+            return RespondSuccess ( contentType , contentLength , "utf-8" ) ;
         }
+		public string RespondSuccess ( string contentType , long contentLength , string charset )
+		{
+			stringBuilder.Clear () ;
+			stringBuilder.Append ( "HTTP/1.1 200 OK\r\nContent-Type: " ) ;
+			stringBuilder.Append ( contentType ) ;
+			stringBuilder.Append ( "; charset=" ) ;
+			stringBuilder.Append ( charset ) ;
+			stringBuilder.Append ( "\r\nContent-Length: " ) ;
+			stringBuilder.Append ( contentLength.ToString () ) ;
+			stringBuilder.Append ( "\r\nConnection: close\r\n\r\n" ) ;
+			string header = stringBuilder.ToString() ;
+			 Byte[] bytes = Encoding.ASCII.GetBytes ( header ) ;
+            _stream.Write ( bytes , 0 , bytes.Length ) ;
+			return header ;
+		}
+
 		/// <summary>
         /// I am not convinced that this function is indeed safe from hacking file path tricks
         /// </summary>

@@ -46,6 +46,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Client\WebSocketClient.cs" />
+    <Compile Include="Common\CertificateSource.cs" />
     <Compile Include="Common\WebSocketFrameCommon.cs" />
     <Compile Include="Events\BinaryFrameEventArgs.cs" />
     <Compile Include="Events\BinaryMultiFrameEventArgs.cs" />
@@ -79,6 +80,7 @@
     <Compile Include="Exceptions\WebSocketVersionNotSupportedException.cs" />
     <Compile Include="Server\Http\HttpHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Server\Http\TestHttpService.cs" />
     <Compile Include="Server\IHttpServiceFactory.cs" />
     <Compile Include="Server\WebServer.cs" />
     <Compile Include="Server\WebSocket\WebSocketService.cs" />

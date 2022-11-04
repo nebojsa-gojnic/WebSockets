@@ -9,16 +9,18 @@ using System.Net;
 
 namespace WebSockets
 {
-    public class HttpConnectionDetails:EventArgs
+    public class HttpConnectionDetails:EventArgs,IDisposable
     {
-        public Stream stream { get; private set; }
-		public DateTime created { get; private set; }
-        public TcpClient tcpClient { get; private set; }
-        public ConnectionType connectionType { get; private set; }
-        public string requestHeader { get; private set ; }
-		public IPAddress origin { get; private set; }
-		public string responseHeader { get; internal set ; }
-		public Exception codeError { get; internal set ; }
+        public Stream stream { get ; private set ; }
+		public DateTime created { get ; private set ; }
+        public TcpClient tcpClient { get ; private set ; }
+        public ConnectionType connectionType { get; private set ; }
+        public string requestHeader { get ; private set ; }
+		public IPAddress origin { get ; private set ; }
+		public string responseHeader { get ; internal set ; }
+		public Exception error { get ; internal set ; }
+		public SslProtocols sslProtocol { get ; internal set ; }
+		
 
         // this is the path attribute in the first line of the http requestHeader
         public string path { get; private set; }
@@ -40,7 +42,7 @@ namespace WebSockets
 		//	this.responseHeader = responseHeader == null ? "" : responseHeader ;
 		//	this.codeError = codeError ;
   //      }
-		public static Stream GetStream ( TcpClient tcpClient , X509Certificate2 sslCertificate )
+		public static Stream GetStream ( TcpClient tcpClient , X509Certificate2 sslCertificate , SslProtocols sslProtocol )
         {
             Stream stream = tcpClient.GetStream() ;
 
@@ -53,7 +55,7 @@ namespace WebSockets
 
             SslStream sslStream = new SslStream ( stream, false ) ;
             //_logger?.Information ( this.GetType() , "Attempting to secure connection..." ) ;
-            sslStream.AuthenticateAsServer ( sslCertificate , false , SslProtocols.Tls , true ) ;
+            sslStream.AuthenticateAsServer ( sslCertificate , false , sslProtocol , true ) ;
             //_logger?.Information ( this.GetType() , "Connection successfully secured" ) ;
             return sslStream ;
         }
@@ -68,26 +70,51 @@ namespace WebSockets
 			this.created = DateTime.Now ;
 			this.origin = null ;
 			this.responseHeader = "" ;
-			this.codeError = errorOnly ;
+			this.error = errorOnly ;
 		}
-		public HttpConnectionDetails ( TcpClient tcpClient , X509Certificate2 sslCertificate ) 
+		public HttpConnectionDetails ( TcpClient tcpClient , X509Certificate2 sslCertificate , SslProtocols sslProtocol ) 
         {
-			this.codeError = null ;
-            this.stream = GetStream ( tcpClient , sslCertificate ) ;
+			this.error = null ;
+			this.sslProtocol = sslProtocol ;
+			try
+			{
+				this.origin = tcpClient.Client == null ? null : ( ( IPEndPoint ) tcpClient.Client.RemoteEndPoint ).Address ;
+				this.stream = GetStream ( tcpClient , sslCertificate , sslProtocol ) ;
+				this.requestHeader = HttpHelper.ReadHttpHeader ( stream ) ;
+			}
+			catch ( Exception x ) 
+			{ 
+				this.requestHeader = "" ; //!!
+				this.error = x ;
+			}
             this.tcpClient = tcpClient ;
-			this.requestHeader = HttpHelper.ReadHttpHeader ( stream ) ;
+			
 			ConnectionTypeAndPath connectionTypeAndPath = new ConnectionTypeAndPath ( this.requestHeader ) ;
             this.connectionType = connectionTypeAndPath.connectionType ;
             this.path = connectionTypeAndPath.path ;
 			this.created = DateTime.Now ;
-			this.origin = tcpClient.Client == null ? null : ( ( IPEndPoint ) tcpClient.Client.RemoteEndPoint ).Address ;
 			this.responseHeader = "" ;
         }
 		public override string ToString()
 		{
 			return ( requestHeader == null ? "!" : requestHeader.Replace ( "\r\n" , " " ) ) + 
-				( codeError == null ? "" : "\r\nError:" + codeError.Message ) +
+				( error == null ? "" : error.InnerException == null ? error.Message : error.InnerException.Message ) + " " +
 				created.ToString ( "yyyy-MM-hh dd:HH:ss" ) + "   " + ( origin == null ? "?" : origin.ToString () ) + "  ->  " + responseHeader  ;
+		}
+		public virtual bool isDisposed
+		{
+			get ;
+			protected set ;
+		}
+		public virtual void Dispose()
+		{
+			if ( isDisposed ) return ;
+			isDisposed = true ;
+			try
+			{
+				if ( tcpClient != null ) tcpClient.Dispose () ;
+			}
+			catch { }
 		}
 	}
 }

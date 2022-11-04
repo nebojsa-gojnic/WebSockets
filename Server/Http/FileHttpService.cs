@@ -13,13 +13,17 @@ namespace WebSockets
     public class FileHttpService : HttpServiceBase
     {
        
-
-        public FileHttpService ( Stream stream , string path , string webRoot , IWebSocketLogger logger )
+		public FileHttpService ( Stream stream , string path , string webRoot , IWebSocketLogger logger ) :
+						  this ( stream , "urf-8" , path , webRoot , logger ) 
+		{
+		}
+        public FileHttpService ( Stream stream , string encoding , string path , string webRoot , IWebSocketLogger logger )
         {
-            _stream = stream;
-            _path = path;
-            _webRoot = webRoot;
-            _logger = logger;
+			_enconding = encoding ;
+            _stream = stream ;
+            _path = path ;
+            _webRoot = webRoot ;
+            _logger = logger ;
             _mimeTypes = MimeTypesFactory.GetMimeTypes ( webRoot ) ;
         }
 
@@ -70,7 +74,7 @@ namespace WebSockets
 						*/
 						int buffSize = 65536 ;
 						Byte [ ] buffer = new byte [ buffSize ] ;
-						responseHeader = RespondChunkedSuccess ( contentType ) ;
+						responseHeader = RespondChunkedSuccess ( contentType , _enconding ) ;
 						fileStream = File.OpenRead ( fullFileNamePath ) ;
 						int r = fileStream.Read ( buffer , 0 , buffSize ) ;
 						while ( r == buffSize )

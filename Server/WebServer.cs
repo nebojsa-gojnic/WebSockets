@@ -24,34 +24,38 @@ namespace WebSockets
 		public readonly IHttpServiceFactory serviceFactory;
         private readonly IWebSocketLogger _logger;
         private X509Certificate2 _sslCertificate;
-        private TcpListener _listener;
+		private SslProtocols _sslProtocol ;
+        private TcpListener _listener ;
 		protected EventHandler _disposed ;
 		protected EventHandler _started ;
 		protected EventHandler _stoped ;
-		protected EventHandler<HttpConnectionDetails> _errorRaised ;
+		protected EventHandler<HttpConnectionDetails> _connectionErrorRaised ;
+		protected ErrorEventHandler _criticalErrorRaised ;
 		private bool _isDisposed = false;
 
         public WebServer ( IHttpServiceFactory serviceFactory , EventHandler<HttpConnectionDetails> clientConnectedEventHandler , 
 																EventHandler<HttpConnectionDetails> serverRespondedEventHandler ,
 																EventHandler startedEventHandle ,
 																EventHandler stopedEventHandle ,
-																EventHandler<HttpConnectionDetails> errorEventHandler ,
+																EventHandler<HttpConnectionDetails> connectionErrorEventHandler ,
+																ErrorEventHandler criticalErrorEventHandler ,
 																EventHandler disposedEventHandle ) : 
 								   this ( serviceFactory , null , clientConnectedEventHandler , serverRespondedEventHandler , 
-									   startedEventHandle  , stopedEventHandle , errorEventHandler , disposedEventHandle )
+									   startedEventHandle  , stopedEventHandle , connectionErrorEventHandler , criticalErrorEventHandler , disposedEventHandle )
         {
         }
         public WebServer ( IHttpServiceFactory serviceFactory , IWebSocketLogger logger ) : 
-			this ( serviceFactory , logger , null , null , null , null , null , null )
+			this ( serviceFactory , logger , null , null , null , null , null , null , null )
         {
         }
         public WebServer ( IHttpServiceFactory serviceFactory , IWebSocketLogger logger , 
 						EventHandler<HttpConnectionDetails> clientConnectedEventHandler , 
 						EventHandler<HttpConnectionDetails> serverRespondedEventHandler ,
 						EventHandler startedEventHandle , EventHandler stopedEventHandle , 
-						EventHandler<HttpConnectionDetails> errorEventHandler , EventHandler disposedEventHandler )
+						EventHandler<HttpConnectionDetails> connectionErrorEventHandler , 
+						ErrorEventHandler criticalErrorEventHandler ,
+						EventHandler disposedEventHandler )
         {
-			_disposed = null ;
             this.serviceFactory = serviceFactory ;
             _logger = logger;
             _openConnections = new List<IDisposable>();
@@ -60,26 +64,25 @@ namespace WebSockets
 			_started = startedEventHandle ;
 			_stoped = stopedEventHandle ;	
 			_disposed = disposedEventHandler ;
-			_errorRaised = errorEventHandler ;
+			_connectionErrorRaised = connectionErrorEventHandler ;
+			_criticalErrorRaised = criticalErrorEventHandler ;
         }
 		protected int _port ;
 		public int port 
 		{
-			get => _port ;
+			get => _listener == null ? _port : ( ( IPEndPoint ) _listener.LocalEndpoint ).Port ;
 		}
-        public void Listen ( int port , X509Certificate2 sslCertificate )
+        public void Listen ( int port , X509Certificate2 sslCertificate , SslProtocols sslProtocol )
         {
-            //try
-            //{
-                _sslCertificate = sslCertificate ;
-                IPAddress localAddress = IPAddress.Any ;
-                _listener = new TcpListener ( localAddress , port ) ;
-                _listener.Start() ;
-                _logger?.Information ( GetType() , "Server started listening on port {0}" , port ) ;
-				_port = port ;
-				_started?.Invoke ( this , new EventArgs () ) ;
-                StartAccept() ;
-            //}
+            _sslCertificate = sslCertificate ;
+			_sslProtocol = sslProtocol ;
+            IPAddress localAddress = IPAddress.Any ;
+            _listener = new TcpListener ( localAddress , port ) ;
+            _listener.Start() ;
+            _logger?.Information ( GetType() , "Server started listening on port {0}" , port ) ;
+			_port = port ;
+			_started?.Invoke ( this , new EventArgs () ) ;
+            StartAccept() ;
             //catch (SocketException ex)
             //{
             //    string message = string.Format("Error listening on port {0}. Make sure IIS or another application is not running and consuming your port.", port);
@@ -92,7 +95,7 @@ namespace WebSockets
         /// </summary>
         public void Listen ( int port )
         {
-            Listen ( port , null ) ;
+            Listen ( port , null , SslProtocols.None ) ;
         }
 
 
@@ -133,24 +136,24 @@ namespace WebSockets
         //    }
         //}
 
-        private Stream GetStream ( TcpClient tcpClient )
-        {
-            Stream stream = tcpClient.GetStream();
+   //     private Stream GetStream ( TcpClient tcpClient )
+   //     {
+   //         Stream stream = tcpClient.GetStream();
 
-            // we have no ssl certificate
-            if ( _sslCertificate == null )
-            {
-                _logger?.Information ( this.GetType(), "Connection not secure" ) ;
-                return stream ;
-            }
+   //         // we have no ssl certificate
+   //         if ( _sslCertificate == null )
+   //         {
+   //             _logger?.Information ( this.GetType(), "Connection not secure" ) ;
+   //             return stream ;
+   //         }
 
-            SslStream sslStream = new SslStream ( stream , false ) ;
-            _logger?.Information ( this.GetType() , "Attempting to secure connection..." ) ;
-			//( SslProtocols ) 12288 
-            sslStream.AuthenticateAsServer ( _sslCertificate , false , SslProtocols.Tls12 , true ) ;
-            _logger?.Information ( this.GetType() , "Connection successfully secured" ) ;
-            return sslStream ;
-        }
+   //         SslStream sslStream = new SslStream ( stream , false ) ;
+   //         _logger?.Information ( this.GetType() , "Attempting to secure connection..." ) ;
+			////( SslProtocols ) 12288 
+   //         sslStream.AuthenticateAsServer ( _sslCertificate , false , SslProtocols.Tls12 , true ) ;
+   //         _logger?.Information ( this.GetType() , "Connection successfully secured" ) ;
+   //         return sslStream ;
+   //     }
 
         private void HandleAsyncConnection ( IAsyncResult result )
         {
@@ -166,7 +169,7 @@ namespace WebSockets
                 using ( TcpClient tcpClient = _listener.EndAcceptTcpClient ( result ) )
                 {
                     // we are ready to listen for more connections (on another thread)
-					connectionDetails = new HttpConnectionDetails ( tcpClient , _sslCertificate ) ;
+					connectionDetails = new HttpConnectionDetails ( tcpClient , _sslCertificate , _sslProtocol ) ;
                     StartAccept();
                     _logger?.Information(this.GetType(), "Server: Connection opened");
 
@@ -175,34 +178,38 @@ namespace WebSockets
 
                     // extract the connection details and use those details to build a connection
                     
-					_clientConnected?.Invoke ( this , connectionDetails ) ;
-                    using ( IHttpService service = this.serviceFactory.CreateInstance ( connectionDetails ) )
-                    {
-                        try
-                        {
-                            // record the connection so we can close it if something goes wrong
-                            lock ( _openConnections )
-                                _openConnections.Add ( service ) ;
+					if ( connectionDetails.error == null )
+					{
+						_clientConnected?.Invoke ( this , connectionDetails ) ;
+						IHttpService service = this.serviceFactory.CreateInstance ( connectionDetails ) ;
+						try
+						{
+							// record the connection so we can close it if something goes wrong
+							lock ( _openConnections )
+								_openConnections.Add ( service ) ;
 
-                            // respond to the http request.
-                            // Take a look at the WebSocketConnection or HttpConnection classes
+							// respond to the http request.
+							// Take a look at the WebSocketConnection or HttpConnection classes
 							string responseHeader ;
-							Exception codeError ;
-                            service.Respond ( out responseHeader , out codeError  ) ;
+							Exception error ;
+							service.Respond ( out responseHeader , out error ) ;
 							connectionDetails.responseHeader = responseHeader ;
-							connectionDetails.codeError = codeError ;
+							connectionDetails.error = error ;
 							_serverResponded?.Invoke ( this , connectionDetails ) ;
-                        }
-                        finally
-                        {
-                            // forget the connection, we are done with it
-                            lock ( _openConnections )
-                                _openConnections.Remove ( service );
-                        }
-                    }
+						}
+						finally
+						{
+							// forget the connection, we are done with it
+							lock ( _openConnections )
+								_openConnections.Remove ( service ) ;
+							service.Dispose () ;
+						}
+					}
+					else _connectionErrorRaised?.Invoke ( this , connectionDetails ) ;
+                    
                 }
 
-                _logger?.Information(this.GetType(), "Server: Connection closed");
+                _logger?.Information ( this.GetType() , "Server: Connection closed" ) ;
             }
             catch ( ObjectDisposedException )
             {
@@ -210,11 +217,13 @@ namespace WebSockets
             }
             catch ( Exception ex )
             {
-				if ( connectionDetails == null )
-					connectionDetails = new HttpConnectionDetails ( ex ) ;
-				else connectionDetails.codeError = ex ;
-				_errorRaised?.Invoke ( this , connectionDetails ) ;
                 _logger?.Error ( this.GetType(), ex ) ;
+				try
+				{
+					_criticalErrorRaised?.Invoke ( this , new ErrorEventArgs ( ex  ) ) ;
+				}
+				catch { }
+				Stop ( true ) ;
             }
         }
 		protected EventHandler<HttpConnectionDetails> _clientConnected ;
@@ -229,28 +238,26 @@ namespace WebSockets
 			add => _serverResponded += value ;	
 			remove => _serverResponded -= value ;
 		}
-        private void CloseAllConnections()
+        private void closeAllConnections()
         {
-            IDisposable[] openConnections;
+            IDisposable[] openConnections ;
 
-            lock (_openConnections)
+            lock ( _openConnections ) 
             {
-                openConnections = _openConnections.ToArray();
-                _openConnections.Clear();
+                openConnections = _openConnections.ToArray() ;
+                _openConnections.Clear() ;
             }
 
             // safely attempt to close each connection
-            foreach (IDisposable openConnection in openConnections)
-            {
+            foreach ( IDisposable openConnection in openConnections )
                 try
                 {
-                    openConnection.Dispose();
+                    openConnection.Dispose() ;
                 }
-                catch (Exception ex)
+                catch ( Exception ex )
                 {
-                    _logger?.Error(this.GetType(), ex);
+                    _logger?.Error ( GetType() , ex ) ;
                 }
-            }
         }
 		public event EventHandler started 
 		{
@@ -262,10 +269,15 @@ namespace WebSockets
 			add => _stoped+= value ;
 			remove => _stoped -= value ;
 		}
-		public event EventHandler<HttpConnectionDetails> errorRaised 
+		public event EventHandler<HttpConnectionDetails> connectionErrorRaised 
 		{
-			add => _errorRaised += value ;
-			remove => _errorRaised -= value ;
+			add => _connectionErrorRaised += value ;
+			remove => _connectionErrorRaised -= value ;
+		}
+		public event ErrorEventHandler criticalErrorRaised 
+		{
+			add => _criticalErrorRaised += value ;
+			remove => _criticalErrorRaised -= value ;
 		}
 		public event EventHandler disposed 
 		{
@@ -274,7 +286,29 @@ namespace WebSockets
 		}
 		public bool Stop ()
 		{
-			if ( _listener == null ) return false ;
+			return Stop ( false ) ;
+		}
+		//protected bool getIsActive ()
+		//{
+		//	try
+		//	{
+		//		int i = _listener.is
+		//		return true ;
+		//	}
+		//	catch { }
+		//	return false ;
+		//}
+		public bool isActive 
+		{
+			get => _listener != null ;
+		}
+		public bool Stop ( bool killConnections )
+		{
+			if ( _listener == null ) 
+			{
+				if ( killConnections ) closeAllConnections () ; //!!!
+				return false ;
+			}
 			try
 			{
 				lock ( _listener )
@@ -282,15 +316,18 @@ namespace WebSockets
                     if ( _listener.Server != null ) _listener.Server.Close() ;
 					_listener.Stop() ;
                 }
-				_listener = null ;
+				//_listener = null ; //nooo!!!
 				_logger?.Information ( GetType() , "Web server stoped" ) ;
+
+				if ( killConnections ) closeAllConnections () ;
+				_listener = null ;
 				return true ;
 			}
 			catch ( Exception x )
 			{ 
 				_logger?.Information ( GetType() , "Error stoping server: " + x.Message ) ;
 			}
-			
+			_listener = null ;
 			_stoped?.Invoke ( this , new EventArgs () ) ;
 			return false ;
 		}
@@ -303,11 +340,9 @@ namespace WebSockets
         {
             if ( !_isDisposed )
             {
-                _isDisposed = true;
+                _isDisposed = true ;
 
-                Stop () ;
-
-                CloseAllConnections() ;
+                Stop ( true ) ;
                 _logger?.Information ( GetType() , "Web server disposed" ) ;
 				//_disposed?.BeginInvoke ( this ,  new EventArgs () , null , null ) ;
 				_disposed?.Invoke ( this ,  new EventArgs () ) ;

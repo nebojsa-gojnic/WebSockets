@@ -8,8 +8,8 @@ namespace WebSockets
         /// </summary>
 		/// </summary>
 		/// <param name="responseHeader">Resonse header</param>
-		/// <param name="codeError">Code execution error(if any)</param>
+		/// <param name="error">Code execution error(if any)</param>
 		/// <returns>Returns true if response is 400 and everything OK</returns>
-		bool Respond ( out string responseHeader , out Exception codeError ) ;
+		bool Respond ( out string responseHeader , out Exception error ) ;
     }
 }

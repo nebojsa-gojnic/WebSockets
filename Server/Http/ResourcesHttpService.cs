@@ -28,9 +28,14 @@ namespace WebSockets
 			MainPage = new MainPage () ;
 
 		*/
-        public ResourcesHttpService ( Stream stream , string path , Dictionary<string, string> resourcePaths , Assembly resourceAssebly , IWebSocketLogger logger )
+		public ResourcesHttpService ( Stream stream , string path , Dictionary<string, string> resourcePaths , Assembly resourceAssebly , IWebSocketLogger logger ) :
+						       this ( stream , "urf-8" , path , resourcePaths , resourceAssebly , logger ) 
+		{
+		}
+        public ResourcesHttpService ( Stream stream , string encoding , string path , Dictionary<string, string> resourcePaths , Assembly resourceAssebly , IWebSocketLogger logger )
         {
             _stream = stream ;
+			_enconding = encoding ;
             _path = path ;
             _logger = logger ;
 			_resourcePaths = resourcePaths ;
@@ -82,7 +87,7 @@ namespace WebSockets
 								}
 							}
 							if ( r > 0 ) ms.Write ( bytes , 0 , r ) ;
-							RespondSuccess ( contentType, ms.Length ) ;
+							RespondSuccess ( contentType, ms.Length , _enconding ) ;
 							ms.Position = 0 ;
 							bytes = new byte [ ms.Length ] ;
 							ms.Read ( bytes , 0 , bytes.Length ) ;

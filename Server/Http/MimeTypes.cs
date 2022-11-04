@@ -7,6 +7,13 @@ namespace WebSockets
 {
     public class MimeTypes : Dictionary<string,string>
     {
+		public const string Html = "text/html" ;
+		public const string Text = "text/plain" ;
+        public const string json = "application/json"  ;
+		//public MimeTypes ( string extension , string mimeType )
+		//{
+		//	Add ( extension , mimeType ) ;
+		//}
         public MimeTypes ( string webRoot )
         {
             string configFileName = webRoot + @"\MimeTypes.config" ;

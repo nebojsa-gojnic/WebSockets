@@ -1,20 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Net.Sockets;
-using System.Diagnostics;
-using System.Runtime.Remoting.Messaging;
+﻿using System ;
+using System.Collections.Generic ;
+using System.IO; 
+using System.Reflection ;
+using System.Text ;
+using System.Text.RegularExpressions ;
+using System.Net.Sockets ;
+using System.Diagnostics ;
+using System.Runtime.Remoting.Messaging ;
 
 namespace WebSockets
 {
+	/// <summary>
+	/// Class for making IHttpService.
+	/// Depending on constructor it may spawn diferent classes.<br/>
+	/// Resource based server(ResourcesHttpService), file based server(FileHttpService), test response.
+	/// </summary>
     public class HttpServiceFactory : IHttpServiceFactory
     {
         private readonly IWebSocketLogger _logger;
 		private readonly string _webroot ;
+		private readonly string _message ;
 		public string webroot 
 		{
 			get => _webroot ;
@@ -36,6 +41,11 @@ namespace WebSockets
 
         //    return Path.GetDirectoryName(Assembly.GetExecutingAssembly().GetName().CodeBase).Replace(@"file:\", string.Empty);
         //}
+		public HttpServiceFactory ( string message )
+		{
+			_message = message ;
+			_CreateInstanceMethod = CreateTestInstance ;
+		}
 
         public HttpServiceFactory ( Assembly resourceAssembly , IWebSocketLogger logger ) : this ( null , resourceAssembly , logger ) 
         {
@@ -49,6 +59,11 @@ namespace WebSockets
 		{
 			get => _CreateInstanceMethod == CreateInstanceFromAssembly ; 
 		}
+		/// <summary>
+		/// Creates new HttpServiceFactory instance for file based server. It spawns FileHttpService instance(s) as answer to http requestes
+		/// </summary>
+		/// <param name="path"></param>
+		/// <param name="logger"></param>
 		public HttpServiceFactory ( string path , IWebSocketLogger logger ) : this ( path , null , logger ) 
         {
 			_CreateInstanceMethod = CreateInstanceFromPath ;
@@ -60,6 +75,10 @@ namespace WebSockets
             _logger = logger ;
 		}
 		public delegate IHttpService CreateInstanceDelegate ( HttpConnectionDetails connectionDetails ) ;
+		public IHttpService CreateTestInstance ( HttpConnectionDetails connectionDetails )
+        {
+            return new TestHttpService ( connectionDetails.stream , connectionDetails.path , _message , _logger ) ;
+        }
         public IHttpService CreateInstanceFromAssembly ( HttpConnectionDetails connectionDetails )
         {
             return new ResourcesHttpService ( connectionDetails.stream , connectionDetails.path , _resourcePaths , _assembly , _logger ) ;
