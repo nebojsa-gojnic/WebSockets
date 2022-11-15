@@ -131,7 +131,7 @@ namespace WebSockets
 
             try
             {
-                response = HttpHelper.ReadHttpHeader(stream);
+                response = HttpServiceBase.ReadHttpHeader ( stream ) ;
             }
             catch (Exception ex)
             {

@@ -8,9 +8,8 @@ using System.IO;
 
 namespace WebSockets
 {
-    public class BadRequestService : IHttpService
+    public class BadRequestService : HttpServiceBase
     {
-        private readonly Stream _stream;
         private readonly string _header;
         private readonly IWebSocketLogger _logger;
 
@@ -21,13 +20,13 @@ namespace WebSockets
             _logger = logger;
         }
 
-        public bool Respond ( out string responseHeader , out Exception codeError )
+        public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
         {
 			responseHeader = "HTTP/1.1 400 Bad Request" ;
 			codeError = null ;
 			try
 			{
-				HttpHelper.WriteHttpHeader ( responseHeader , _stream ) ;
+				HttpServiceBase.WriteHttpHeader ( responseHeader , _stream ) ;
 
 				// limit what we log. Headers can be up to 16K in size
 				string header = _header.Length > 255 ? _header.Substring(0,255) + "..." : _header;
@@ -39,8 +38,16 @@ namespace WebSockets
 			}
 			return false ;
         }
-
-        public void Dispose()
+		/// <summary>
+		/// Returns null
+		/// </summary>
+		/// <param name="uri">Target uri</param>
+		/// <returns>stream to resource specified by given uri</returns>
+		public override Stream GetResourceStream ( Uri uri ) 
+		{
+			return null ;
+		}
+        public override void Dispose()
         {
             // do nothing
         }

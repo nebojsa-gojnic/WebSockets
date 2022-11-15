@@ -34,6 +34,9 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\SimpleHttp\packages\Newtonsoft.Json.13.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Net" />
@@ -66,19 +69,20 @@
     <Compile Include="Exceptions\ServerListenerSocketException.cs" />
     <Compile Include="Exceptions\WebSocketHandshakeFailedException.cs" />
     <Compile Include="Server\ConnectionType.cs" />
-    <Compile Include="Server\ConnectionTypeAndPath.cs" />
+    <Compile Include="Server\ConnectionTypeAndRequest.cs" />
+    <Compile Include="Server\ErrorAndUriEventArgs.cs" />
     <Compile Include="Server\Http\BadRequestService.cs" />
     <Compile Include="Server\Http\FileHttpService.cs" />
     <Compile Include="Server\Http\HttpConnectionDetails.cs" />
     <Compile Include="Server\Http\HttpServiceBase.cs" />
     <Compile Include="Server\Http\HttpServiceFactory.cs" />
     <Compile Include="Server\Http\IHttpService.cs" />
+    <Compile Include="Server\Http\MimeTypeAndCharset.cs" />
+    <Compile Include="Server\Http\MimeTypeDictionary.cs" />
     <Compile Include="Server\Http\ResourcesHttpService.cs" />
     <Compile Include="Server\Http\MimeTypes.cs" />
-    <Compile Include="Server\Http\MimeTypesFactory.cs" />
     <Compile Include="Exceptions\EntityTooLargeException.cs" />
     <Compile Include="Exceptions\WebSocketVersionNotSupportedException.cs" />
-    <Compile Include="Server\Http\HttpHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Server\Http\TestHttpService.cs" />
     <Compile Include="Server\IHttpServiceFactory.cs" />
@@ -91,6 +95,7 @@
     <None Include="MimeTypes.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

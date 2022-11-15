@@ -13,25 +13,45 @@ namespace WebSockets
 {
     public class WebSocketService : WebSocketBase , IHttpService
     {
-        private readonly Stream _stream;
-        private readonly string _header;
-        private readonly IWebSocketLogger _logger;
-        private readonly TcpClient _tcpClient;
-        private bool _isDisposed = false;
+        private readonly Stream _stream ;
+        private readonly string _header ;
+        private readonly IWebSocketLogger _logger ;
+        private readonly TcpClient _tcpClient ;
+        private bool _isDisposed = false ;
+		/// <summary>
+		/// Stream instance to read request from (not necessarily same as original network stream)
+		/// </summary>
+		public Stream stream 
+		{
+			get => _stream ;
+		}
+
+		/// <summary>
+		/// Requested path
+		/// </summary>
+        protected Uri _requestedPath ;
+
+		/// <summary>
+		/// Requested path
+		/// </summary>
+        public Uri requestedPath 
+		{
+			get => _requestedPath ;
+		}
 
         public WebSocketService ( Stream stream , TcpClient tcpClient , string header , bool noDelay , IWebSocketLogger logger ) : base ( logger )
         {
-            _stream = stream;
-            _header = header;
-            _logger = logger;
-            _tcpClient = tcpClient;
+            _stream = stream ;
+            _header = header ;
+            _logger = logger ;
+            _tcpClient = tcpClient ;
 
             // send requests immediately if true (needed for small low latency packets but not a long stream). 
             // Basically, dont wait for the buffer to be full before before sending the packet
-            tcpClient.NoDelay = noDelay;
+            tcpClient.NoDelay = noDelay ;
         }
 
-        public bool Respond ( out string responseHeader , out Exception codeError )
+        public bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
         {
 			responseHeader = "" ; 
 			codeError = null ;
@@ -71,18 +91,18 @@ namespace WebSockets
                                    + "Upgrade: websocket\r\n"
                                    + "Sec-WebSocket-Accept: " + setWebSocketAccept);
 
-                HttpHelper.WriteHttpHeader(response, stream);
+                HttpServiceBase.WriteHttpHeader(response, stream);
                 _logger.Information(this.GetType(), "Web Socket handshake sent");
             }
             catch (WebSocketVersionNotSupportedException)
             {
                 string response = "HTTP/1.1 426 Upgrade Required" + Environment.NewLine + "Sec-WebSocket-Version: 13";
-                HttpHelper.WriteHttpHeader(response, stream);
+                HttpServiceBase.WriteHttpHeader(response, stream);
                 throw;
             }
             catch (Exception)
             {
-                HttpHelper.WriteHttpHeader("HTTP/1.1 400 Bad Request", stream);
+                HttpServiceBase.WriteHttpHeader("HTTP/1.1 400 Bad Request", stream);
                 throw;
             }
         }
@@ -112,7 +132,15 @@ namespace WebSockets
                 CloseConnection(_tcpClient.Client);
             }
         }
-
+		/// <summary>
+		/// Returns null!!
+		/// </summary>
+		/// <param name="uri"></param>
+		/// <returns></returns>
+		public virtual Stream GetResourceStream ( Uri uri )
+		{
+			return null ;
+		}
         protected override void OnConnectionClose(byte[] payload)
         {
             Send(WebSocketOpCode.ConnectionClose, payload);

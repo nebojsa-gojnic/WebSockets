@@ -20,17 +20,42 @@ namespace WebSockets
     public class WebServer : IDisposable
     {
         // maintain a list of open connections so that we can notify the client if the server shuts down
-        private readonly List<IDisposable> _openConnections;
-		public readonly IHttpServiceFactory serviceFactory;
-        private readonly IWebSocketLogger _logger;
-        private X509Certificate2 _sslCertificate;
-		private SslProtocols _sslProtocol ;
+        private readonly List<IDisposable> _openConnections ;
+		public readonly IHttpServiceFactory serviceFactory ;
+        private readonly IWebSocketLogger _logger ;
+		/// <summary>
+		/// All already requested mime types are stored in this dictionary.
+		/// <br/>If a folder does not exists in the dictionary key list it means it has not been demaned yet.
+		/// <br/>If a folder exists in the dictionary but there are no mime types defined 
+		/// </summary>
+        private MimeTypeDictionary mimeTypesByFolder ;
+
+        public X509Certificate2 sslCertificate 
+		{
+			get ;
+			protected set ;
+		}
+		public SslProtocols sslProtocol 
+		{
+			get ;
+			protected set ;
+		}
         private TcpListener _listener ;
 		protected EventHandler _disposed ;
 		protected EventHandler _started ;
 		protected EventHandler _stoped ;
 		protected EventHandler<HttpConnectionDetails> _connectionErrorRaised ;
-		protected ErrorEventHandler _criticalErrorRaised ;
+		protected EventHandler<ErrorAndUriEventArgs> _criticalErrorRaised ;
+		public bool isListening 
+		{
+			get ;
+			protected set ;
+		}
+		public bool isSecure
+		{
+			get => sslCertificate != null ;
+		}
+		
 		private bool _isDisposed = false;
 
         public WebServer ( IHttpServiceFactory serviceFactory , EventHandler<HttpConnectionDetails> clientConnectedEventHandler , 
@@ -38,7 +63,7 @@ namespace WebSockets
 																EventHandler startedEventHandle ,
 																EventHandler stopedEventHandle ,
 																EventHandler<HttpConnectionDetails> connectionErrorEventHandler ,
-																ErrorEventHandler criticalErrorEventHandler ,
+																EventHandler<ErrorAndUriEventArgs> criticalErrorEventHandler ,
 																EventHandler disposedEventHandle ) : 
 								   this ( serviceFactory , null , clientConnectedEventHandler , serverRespondedEventHandler , 
 									   startedEventHandle  , stopedEventHandle , connectionErrorEventHandler , criticalErrorEventHandler , disposedEventHandle )
@@ -53,7 +78,7 @@ namespace WebSockets
 						EventHandler<HttpConnectionDetails> serverRespondedEventHandler ,
 						EventHandler startedEventHandle , EventHandler stopedEventHandle , 
 						EventHandler<HttpConnectionDetails> connectionErrorEventHandler , 
-						ErrorEventHandler criticalErrorEventHandler ,
+						EventHandler<ErrorAndUriEventArgs> criticalErrorEventHandler ,
 						EventHandler disposedEventHandler )
         {
             this.serviceFactory = serviceFactory ;
@@ -66,6 +91,8 @@ namespace WebSockets
 			_disposed = disposedEventHandler ;
 			_connectionErrorRaised = connectionErrorEventHandler ;
 			_criticalErrorRaised = criticalErrorEventHandler ;
+			isListening = false ;
+			mimeTypesByFolder = new MimeTypeDictionary () ;
         }
 		protected int _port ;
 		public int port 
@@ -74,11 +101,12 @@ namespace WebSockets
 		}
         public void Listen ( int port , X509Certificate2 sslCertificate , SslProtocols sslProtocol )
         {
-            _sslCertificate = sslCertificate ;
-			_sslProtocol = sslProtocol ;
+            this.sslCertificate = sslCertificate ;
+			this.sslProtocol = sslProtocol ;
             IPAddress localAddress = IPAddress.Any ;
             _listener = new TcpListener ( localAddress , port ) ;
             _listener.Start() ;
+			isListening = true ;
             _logger?.Information ( GetType() , "Server started listening on port {0}" , port ) ;
 			_port = port ;
 			_started?.Invoke ( this , new EventArgs () ) ;
@@ -105,62 +133,12 @@ namespace WebSockets
             _listener.BeginAcceptTcpClient ( new AsyncCallback ( HandleAsyncConnection ), null );
         }
 		
-        //private static HttpConnectionDetails GetConnectionDetails ( Stream stream , TcpClient tcpClient ) 
-        //{
-        //    // read the header and check that it is a GET request
-        //    string header = HttpHelper.ReadHttpHeader(stream);
-        //    Regex getRegex = new Regex(@"^GET(.*)HTTP\/1\.1", RegexOptions.IgnoreCase);
-
-        //    Match getRegexMatch = getRegex.Match(header);
-        //    if (getRegexMatch.Success)
-        //    {
-        //        // extract the path attribute from the first line of the header
-        //        string path = getRegexMatch.Groups[1].Value.Trim();
-
-        //        // check if this is a web socket upgrade request
-        //        Regex webSocketUpgradeRegex = new Regex("Upgrade: websocket", RegexOptions.IgnoreCase);
-        //        Match webSocketUpgradeRegexMatch = webSocketUpgradeRegex.Match(header);
-
-        //        if (webSocketUpgradeRegexMatch.Success)
-        //        {
-        //            return new HttpConnectionDetails (stream, tcpClient, path, ConnectionType.WebSocket, header);
-        //        }
-        //        else
-        //        {
-        //            return new HttpConnectionDetails (stream, tcpClient, path, ConnectionType.Http, header);
-        //        }
-        //    }
-        //    else
-        //    {
-        //        return new HttpConnectionDetails (stream, tcpClient, string.Empty, ConnectionType.Unknown, header); 
-        //    }
-        //}
-
-   //     private Stream GetStream ( TcpClient tcpClient )
-   //     {
-   //         Stream stream = tcpClient.GetStream();
-
-   //         // we have no ssl certificate
-   //         if ( _sslCertificate == null )
-   //         {
-   //             _logger?.Information ( this.GetType(), "Connection not secure" ) ;
-   //             return stream ;
-   //         }
-
-   //         SslStream sslStream = new SslStream ( stream , false ) ;
-   //         _logger?.Information ( this.GetType() , "Attempting to secure connection..." ) ;
-			////( SslProtocols ) 12288 
-   //         sslStream.AuthenticateAsServer ( _sslCertificate , false , SslProtocols.Tls12 , true ) ;
-   //         _logger?.Information ( this.GetType() , "Connection successfully secured" ) ;
-   //         return sslStream ;
-   //     }
-
         private void HandleAsyncConnection ( IAsyncResult result )
         {
 			HttpConnectionDetails connectionDetails = null ;
             try
             {
-                if (_isDisposed ) return ;
+                
 
                 // this worker thread stays alive until either of the following happens:
                 // Client sends a close conection request OR
@@ -169,8 +147,9 @@ namespace WebSockets
                 using ( TcpClient tcpClient = _listener.EndAcceptTcpClient ( result ) )
                 {
                     // we are ready to listen for more connections (on another thread)
-					connectionDetails = new HttpConnectionDetails ( tcpClient , _sslCertificate , _sslProtocol ) ;
-                    StartAccept();
+					if ( _isDisposed ) return ;
+					if ( isListening ) StartAccept() ; //!!!
+					connectionDetails = new HttpConnectionDetails ( tcpClient , sslCertificate , sslProtocol ) ;
                     _logger?.Information(this.GetType(), "Server: Connection opened");
 
                     // get a secure or insecure stream
@@ -192,7 +171,7 @@ namespace WebSockets
 							// Take a look at the WebSocketConnection or HttpConnection classes
 							string responseHeader ;
 							Exception error ;
-							service.Respond ( out responseHeader , out error ) ;
+							service.Respond ( mimeTypesByFolder , out responseHeader , out error ) ;
 							connectionDetails.responseHeader = responseHeader ;
 							connectionDetails.error = error ;
 							_serverResponded?.Invoke ( this , connectionDetails ) ;
@@ -220,7 +199,8 @@ namespace WebSockets
                 _logger?.Error ( this.GetType(), ex ) ;
 				try
 				{
-					_criticalErrorRaised?.Invoke ( this , new ErrorEventArgs ( ex  ) ) ;
+					_criticalErrorRaised?.Invoke ( this , 
+						new ErrorAndUriEventArgs ( connectionDetails == null ? null : connectionDetails.uri , ex ) ) ;
 				}
 				catch { }
 				Stop ( true ) ;
@@ -274,7 +254,7 @@ namespace WebSockets
 			add => _connectionErrorRaised += value ;
 			remove => _connectionErrorRaised -= value ;
 		}
-		public event ErrorEventHandler criticalErrorRaised 
+		public event EventHandler<ErrorAndUriEventArgs> criticalErrorRaised 
 		{
 			add => _criticalErrorRaised += value ;
 			remove => _criticalErrorRaised -= value ;
@@ -288,47 +268,30 @@ namespace WebSockets
 		{
 			return Stop ( false ) ;
 		}
-		//protected bool getIsActive ()
-		//{
-		//	try
-		//	{
-		//		int i = _listener.is
-		//		return true ;
-		//	}
-		//	catch { }
-		//	return false ;
-		//}
-		public bool isActive 
-		{
-			get => _listener != null ;
-		}
+
 		public bool Stop ( bool killConnections )
 		{
-			if ( _listener == null ) 
+			mimeTypesByFolder.Clear () ;//!!!
+			if ( isListening )
 			{
-				if ( killConnections ) closeAllConnections () ; //!!!
-				return false ;
+				isListening = false ;
+				try
+				{
+					lock ( _listener )
+					{
+						if ( _listener.Server != null ) _listener.Server.Close() ;
+						_listener.Stop() ;
+					}
+					_logger?.Information ( GetType() , "Web server stoped" ) ;
+					_stoped?.Invoke ( this , new EventArgs () ) ;
+					return true ;
+				}
+				catch ( Exception x )
+				{ 
+					_logger?.Information ( GetType() , "Error stoping server: " + x.Message ) ;
+				}
 			}
-			try
-			{
-				lock ( _listener )
-                {
-                    if ( _listener.Server != null ) _listener.Server.Close() ;
-					_listener.Stop() ;
-                }
-				//_listener = null ; //nooo!!!
-				_logger?.Information ( GetType() , "Web server stoped" ) ;
-
-				if ( killConnections ) closeAllConnections () ;
-				_listener = null ;
-				return true ;
-			}
-			catch ( Exception x )
-			{ 
-				_logger?.Information ( GetType() , "Error stoping server: " + x.Message ) ;
-			}
-			_listener = null ;
-			_stoped?.Invoke ( this , new EventArgs () ) ;
+			if ( killConnections ) closeAllConnections () ;
 			return false ;
 		}
 		public bool isDisposed 

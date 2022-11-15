@@ -4,6 +4,7 @@ using System.Security.Authentication ;
 using System.Security.Cryptography.X509Certificates ;
 using System.Net.Security ;
 using System.IO ;
+using System.Text ;
 using System.Text.RegularExpressions ;
 using System.Net;
 
@@ -20,10 +21,14 @@ namespace WebSockets
 		public string responseHeader { get ; internal set ; }
 		public Exception error { get ; internal set ; }
 		public SslProtocols sslProtocol { get ; internal set ; }
+		//public MimeTypes mimeTypes { get ; private set ; }
 		
 
-        // this is the path attribute in the first line of the http requestHeader
-        public string path { get; private set; }
+        // 
+		/// <summary>
+		/// Requested path from request header 
+		/// </summary>
+        public Uri uri { get ; private set ; }
 
   //      public HttpConnectionDetails ( Stream stream , TcpClient tcpClient , string path , ConnectionType connectionType , string requestHeader ) :
 		//	this ( stream , tcpClient , path , connectionType , requestHeader , null , null ) 
@@ -60,27 +65,29 @@ namespace WebSockets
             return sslStream ;
         }
 
-		public HttpConnectionDetails ( Exception errorOnly ) 
+		public HttpConnectionDetails ( Uri uri , Exception errorOnly ) 
 		{
             this.stream = null ;
             this.tcpClient = null ;
 			this.requestHeader = "" ;
             this.connectionType = ConnectionType.Unknown ;
-            this.path = "" ;
+            this.uri = uri ;
 			this.created = DateTime.Now ;
 			this.origin = null ;
 			this.responseHeader = "" ;
 			this.error = errorOnly ;
+			//this.mimeTypes = null ;
 		}
 		public HttpConnectionDetails ( TcpClient tcpClient , X509Certificate2 sslCertificate , SslProtocols sslProtocol ) 
         {
-			this.error = null ;
+			
 			this.sslProtocol = sslProtocol ;
+			//this.mimeTypes = mimeTypes ;
 			try
 			{
 				this.origin = tcpClient.Client == null ? null : ( ( IPEndPoint ) tcpClient.Client.RemoteEndPoint ).Address ;
 				this.stream = GetStream ( tcpClient , sslCertificate , sslProtocol ) ;
-				this.requestHeader = HttpHelper.ReadHttpHeader ( stream ) ;
+				this.requestHeader = HttpServiceBase.ReadHttpHeader ( stream ) ;
 			}
 			catch ( Exception x ) 
 			{ 
@@ -89,12 +96,17 @@ namespace WebSockets
 			}
             this.tcpClient = tcpClient ;
 			
-			ConnectionTypeAndPath connectionTypeAndPath = new ConnectionTypeAndPath ( this.requestHeader ) ;
-            this.connectionType = connectionTypeAndPath.connectionType ;
-            this.path = connectionTypeAndPath.path ;
+			ConnectionTypeAndRequest connectionTypeAndRequest = new ConnectionTypeAndRequest ( this.requestHeader ) ;
+            this.connectionType = connectionTypeAndRequest.connectionType ;
+            this.uri = connectionTypeAndRequest.uri ;
+			if ( this.error == null )
+				this.error = uri == null ? new FormatException ( "Invalid uri: \"" + connectionTypeAndRequest.path + "\"" ) : null ;
+
 			this.created = DateTime.Now ;
 			this.responseHeader = "" ;
         }
+		
+
 		public override string ToString()
 		{
 			return ( requestHeader == null ? "!" : requestHeader.Replace ( "\r\n" , " " ) ) + 

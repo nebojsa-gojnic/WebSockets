@@ -7,52 +7,58 @@ using System.IO ;
 using System.Reflection ;
 using System.Configuration ;
 using System.Xml ;
-using static System.Net.Mime.MediaTypeNames;
-using System.Net.Security;
-
+using System.Net.Security ;
 namespace WebSockets
 {
+	/// <summary>
+	/// IHttpService for resource based http response
+	/// </summary>
 	public class ResourcesHttpService : HttpServiceBase
     {
+		/// <summary>
+		/// This dictionary contains lowcase file names for keys and full resource names for values.
+		/// <br/>It speeds up search hopefully.
+		/// </summary>
 		private readonly Dictionary <string, string> _resourcePaths ;
-		private Assembly _resourceAssebly ;
-		/*
+		/// <summary>
+		/// Assembly with resources to load data from
+		/// </summary>
+		private Assembly _resourceAssembly ;
 
-					foreach ( string name in Assembly.GetExecutingAssembly().GetManifestResourceNames() )
-			{
-				System.Diagnostics.Debug.WriteLine ( name ) ;
-			}
-			Stream str = Assembly.GetExecutingAssembly().GetManifestResourceStream ( "WebBrowser.Resources.default.html" ) ;
-			long l = str.Length ;
-			str.Close () ;
-			MainPage = new MainPage () ;
-
-		*/
-		public ResourcesHttpService ( Stream stream , string path , Dictionary<string, string> resourcePaths , Assembly resourceAssebly , IWebSocketLogger logger ) :
-						       this ( stream , "urf-8" , path , resourcePaths , resourceAssebly , logger ) 
-		{
-		}
-        public ResourcesHttpService ( Stream stream , string encoding , string path , Dictionary<string, string> resourcePaths , Assembly resourceAssebly , IWebSocketLogger logger )
+		/// <summary>
+		/// Creates new instance of the ResourcesHttpService instance
+		/// </summary>
+		/// <param name="resourcePaths">Dictionary with lowcase file names for keys and full resource names for values.</param>
+		/// <param name="resourceAssembly">Assembly with resources to load data from</param>
+		/// <param name="stream">Stream to read data from</param>
+		/// <param name="requestedPath">Requested path</param>
+		/// <param name="webroot">Web root path</param>
+		/// <param name="logger">IWebSocketLogger instance or null</param>
+		/// <param name="charset">Value of "charset" (sub)attribute in "Content-Type" response header attribute</param>
+        public ResourcesHttpService ( Stream stream , Uri requestedPath , Dictionary<string, string> resourcePaths , Assembly resourceAssembly , IWebSocketLogger logger )
         {
             _stream = stream ;
-			_enconding = encoding ;
-            _path = path ;
+            _requestedPath = requestedPath ;
             _logger = logger ;
 			_resourcePaths = resourcePaths ;
-			_resourceAssebly = resourceAssebly ;
-			_webRoot = "" ;
-            _mimeTypes = MimeTypesFactory.GetMimeTypes ( "" ) ;
+			_resourceAssembly = resourceAssembly ;
         }
 
-
-        public override bool Respond ( out string responseHeader , out Exception codeError )
+		/// <summary>
+		/// This method sends file from 
+        /// </summary>
+		/// </summary>
+		/// <param name="responseHeader">Resonse header</param>
+		/// <param name="error">Code execution error(if any)</param>
+		/// <returns>Should returns true if response is 400 and everything OK</returns>
+        public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
         {
-            _logger?.Information (  this.GetType(), "Request: {0}", _path ) ;
+            _logger?.Information (  this.GetType(), "Request: {0}", _requestedPath ) ;
 			responseHeader = "" ;
 			codeError = null ;
 			try
 			{
-				string resourcePath = getSafePath ( _path ).Replace ( '\\' , '.' ) ; ;
+				string resourcePath = getSafePath ( "" , _requestedPath.LocalPath ).Replace ( '\\' , '.' ) ; ;
 				if ( ( resourcePath == "" ) || ( resourcePath == "." )  )
 					resourcePath  = "default.html" ; 
 				else if ( resourcePath  [ 0 ] == '.' )
@@ -63,55 +69,51 @@ namespace WebSockets
 				if ( _resourcePaths.ContainsKey ( resourcePath.ToLower() ) )
 				{
 
-					string contentType ;
+					MimeTypeAndCharset contentTypeAndCharset ;
 					string ext = "" ;
 					int i = resourcePath.LastIndexOf ( '.' ) + 1 ;
 					if ( ( i != 0 ) && ( i < resourcePath.Length ) ) ext = resourcePath.Substring ( i ) ;
-					if ( _mimeTypes.TryGetValue ( ext , out contentType ) )
+					if ( mimeTypesByFolder.getMimeTypes ( this , _requestedPath ).TryGetValue ( ext , out contentTypeAndCharset ) )
 					{
-						Stream sr = null ;
+						Stream reourceStream = null ;
 						try
 						{
-							sr = _resourceAssebly.GetManifestResourceStream ( _resourcePaths [ resourcePath ] ) ;
-							System.Diagnostics.Debug.WriteLine (  "resource stream is null:" + ( sr == null ).ToString () ) ;
-							Byte[] bytes = new byte [ 1024 ] ;
-							MemoryStream ms = new MemoryStream () ;
-							int r = sr.Read ( bytes , 0 , 1024 ) ;
-							_logger?.Information ( GetType() , "Fetching resource: {0}" , resourcePath ) ;
-							if ( r > 0 ) 
+							reourceStream = _resourceAssembly.GetManifestResourceStream ( _resourcePaths [ resourcePath ] ) ;
+							//System.Diagnostics.Debug.WriteLine (  "resource stream is null:" + ( reourceStream == null ).ToString () ) ;
+							int buffSize = 65536 ;
+							Byte [ ] buffer = new byte [ buffSize ] ;
+							responseHeader = RespondChunkedSuccess ( contentTypeAndCharset ) ;
+							int r = reourceStream.Read ( buffer , 0 , buffSize ) ;
+							while ( r == buffSize )
 							{
-								while ( r == 1024 )
-								{
-									ms.Write ( bytes , 0 , 1024 ) ;
-									r = sr.Read ( bytes , 0 , 1024 ) ;
-								}
+								WriteChunk ( buffer , buffSize ) ;
+								r = reourceStream.Read ( buffer , 0 , buffSize ) ;
 							}
-							if ( r > 0 ) ms.Write ( bytes , 0 , r ) ;
-							RespondSuccess ( contentType, ms.Length , _enconding ) ;
-							ms.Position = 0 ;
-							bytes = new byte [ ms.Length ] ;
-							ms.Read ( bytes , 0 , bytes.Length ) ;
-							_stream.Write ( bytes , 0 , bytes.Length ) ;
+							WriteChunk ( buffer , r ) ;
+							WriteFinalChunk () ;
+							reourceStream.Flush () ;
+							reourceStream.Close () ;
+							reourceStream.Dispose () ;
 							return true ;
 						}
 						catch 
 						{
-							responseHeader = RespondNotFoundFailure ( _path ) ;
+							responseHeader = RespondNotFoundFailure ( _requestedPath.LocalPath ) ;
 						}
 						try
 						{
-							if ( sr != null ) sr.Close () ;
+							if ( reourceStream  != null ) reourceStream.Close () ;
 						}
 						catch {}
 						try
 						{
-							if ( sr != null ) sr.Dispose () ;
+							if ( reourceStream  != null ) reourceStream.Dispose () ;
 						}
 						catch {}
 					}
-					else responseHeader = RespondMimeTypeFailure ( _path ) ;
+					else responseHeader = RespondMimeTypeFailure ( _requestedPath.LocalPath ) ;
 				}
-				else responseHeader = RespondNotFoundFailure ( _path ) ;
+				else responseHeader = RespondNotFoundFailure ( _requestedPath.LocalPath ) ;
 			}
 			catch ( Exception x )
 			{
@@ -119,12 +121,20 @@ namespace WebSockets
 			}
 			return false ;
         }
+		/// <summary>
+		/// Returns resource stream for target uri. 
+		/// <br/>Uri must point to existing resiurce or exception is raised.
+		/// </summary>
+		/// <param name="uri">Target uri</param>
+		public override Stream GetResourceStream ( Uri uri ) 
+		{
+			string resourcePath = getSafePath ( "" , uri.LocalPath ).Replace ( '\\' , '.' ) ; 
+			if ( ( resourcePath == "" ) || ( resourcePath == "." )  )
+				resourcePath  = "default.html" ; 
+			else if ( resourcePath [ 0 ] == '.' )
+				resourcePath = resourcePath.Substring ( 1 ) ;
+			return _resourceAssembly.GetManifestResourceStream ( _resourcePaths [ resourcePath.ToLower() ] ) ;
+		}
 
-     
-
-        public override void Dispose()
-        {
-            // do nothing. The network stream will be closed by the WebServer
-        }
     }
 }
