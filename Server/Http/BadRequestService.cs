@@ -10,8 +10,7 @@ namespace WebSockets
 {
     public class BadRequestService : HttpServiceBase
     {
-        private readonly string _header;
-        private readonly IWebSocketLogger _logger;
+        private readonly string _header ;
 
         public BadRequestService ( Stream stream , string header , IWebSocketLogger logger )
         {

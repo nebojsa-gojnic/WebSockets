@@ -135,7 +135,7 @@ namespace WebSockets
 		/// <returns>Returns new ResourcesHttpService instance</returns>
         public IHttpService CreateInstanceFromAssembly ( HttpConnectionDetails connectionDetails )
         {
-            return new ResourcesHttpService ( connectionDetails.stream , connectionDetails.uri , resourcePaths , resourceAssembly , _logger ) ;
+            return new ResourcesHttpService ( connectionDetails.stream , connectionDetails.request.uri , resourcePaths , resourceAssembly , _logger ) ;
         }
 		/// <summary>
 		/// Creates and returns FileHttpService instance
@@ -144,7 +144,7 @@ namespace WebSockets
 		/// <returns>Returns new FileHttpService instance</returns>
         public IHttpService CreateInstanceFromPath ( HttpConnectionDetails connectionDetails )
         {
-            return new FileHttpService ( connectionDetails.stream , connectionDetails.uri , webroot , _logger ) ;
+            return new FileHttpService ( connectionDetails.stream , connectionDetails.request.uri  , webroot , _logger ) ;
         }
 		/// <summary>
 		/// Creates and returns TestHttpService instance

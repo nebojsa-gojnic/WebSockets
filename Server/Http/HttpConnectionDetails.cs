@@ -10,109 +10,88 @@ using System.Net;
 
 namespace WebSockets
 {
-    public class HttpConnectionDetails:EventArgs,IDisposable
+    public class HttpConnectionDetails: EventArgs , IDisposable
     {
         public Stream stream { get ; private set ; }
 		public DateTime created { get ; private set ; }
         public TcpClient tcpClient { get ; private set ; }
-        public ConnectionType connectionType { get; private set ; }
-        public string requestHeader { get ; private set ; }
 		public IPAddress origin { get ; private set ; }
-		public string responseHeader { get ; internal set ; }
+		protected string _responseHeader ;
+		protected void setResponseHeader ( string  value ) 
+		{
+			_responseHeader = value ;
+			toStringDirty = true ;
+		}
+		public string responseHeader 
+		{ 
+			get => _responseHeader ; 
+			internal set => setResponseHeader ( value ) ; 
+		}
 		public Exception error { get ; internal set ; }
+		public HttpRequestData request { get ; private set ; }
 		public SslProtocols sslProtocol { get ; internal set ; }
-		//public MimeTypes mimeTypes { get ; private set ; }
-		
-
-        // 
+		public X509Certificate2 sslCertificate { get ; internal set ; }
 		/// <summary>
-		/// Requested path from request header 
+		/// When this flag is up ToString method must create new return value and store it into the _ToString variable
 		/// </summary>
-        public Uri uri { get ; private set ; }
-
-  //      public HttpConnectionDetails ( Stream stream , TcpClient tcpClient , string path , ConnectionType connectionType , string requestHeader ) :
-		//	this ( stream , tcpClient , path , connectionType , requestHeader , null , null ) 
-		//{
-		//}
-  //      public HttpConnectionDetails ( Stream stream , TcpClient tcpClient , string path , ConnectionType connectionType , 
-		//						string requestHeader , string responseHeader , Exception codeError ) 
-  //      {
-  //          this.stream = stream ;
-  //          this.tcpClient = tcpClient ;
-  //          this.path = path ;
-  //          this.connectionType = connectionType ;
-		//	this.requestHeader = requestHeader == null ? "" : requestHeader ;
-		//	this.created = DateTime.Now ;
-		//	this.origin = tcpClient.Client == null ? null : ( ( IPEndPoint ) tcpClient.Client.RemoteEndPoint ).Address ;
-		//	this.responseHeader = responseHeader == null ? "" : responseHeader ;
-		//	this.codeError = codeError ;
-  //      }
+		protected bool toStringDirty ;
+		
 		public static Stream GetStream ( TcpClient tcpClient , X509Certificate2 sslCertificate , SslProtocols sslProtocol )
         {
-            Stream stream = tcpClient.GetStream() ;
-
             // we have no ssl certificate
-            if ( sslCertificate == null )
-            {
-                //_logger?.Information ( this.GetType(), "Connection not secure" ) ;
-                return stream ;
-            }
+            if ( sslCertificate == null ) return tcpClient.GetStream() ;
 
-            SslStream sslStream = new SslStream ( stream, false ) ;
-            //_logger?.Information ( this.GetType() , "Attempting to secure connection..." ) ;
+            SslStream sslStream = new SslStream ( tcpClient.GetStream() , false ) ;
             sslStream.AuthenticateAsServer ( sslCertificate , false , sslProtocol , true ) ;
-            //_logger?.Information ( this.GetType() , "Connection successfully secured" ) ;
             return sslStream ;
         }
-
-		public HttpConnectionDetails ( Uri uri , Exception errorOnly ) 
+		public HttpConnectionDetails ( Uri uri, Exception errorOnly ) 
 		{
             this.stream = null ;
             this.tcpClient = null ;
-			this.requestHeader = "" ;
-            this.connectionType = ConnectionType.Unknown ;
-            this.uri = uri ;
+			this.request = new HttpRequestData ( uri ) ;
 			this.created = DateTime.Now ;
 			this.origin = null ;
 			this.responseHeader = "" ;
 			this.error = errorOnly ;
-			//this.mimeTypes = null ;
-		}
+			toStringDirty = true ;
+		} 
 		public HttpConnectionDetails ( TcpClient tcpClient , X509Certificate2 sslCertificate , SslProtocols sslProtocol ) 
         {
-			
+			this.sslCertificate = sslCertificate ;
 			this.sslProtocol = sslProtocol ;
+			toStringDirty = true ;
 			//this.mimeTypes = mimeTypes ;
 			try
 			{
 				this.origin = tcpClient.Client == null ? null : ( ( IPEndPoint ) tcpClient.Client.RemoteEndPoint ).Address ;
 				this.stream = GetStream ( tcpClient , sslCertificate , sslProtocol ) ;
-				this.requestHeader = HttpServiceBase.ReadHttpHeader ( stream ) ;
 			}
 			catch ( Exception x ) 
 			{ 
-				this.requestHeader = "" ; //!!
+				this.stream = null ;
 				this.error = x ;
 			}
+			this.request = new HttpRequestData ( this ) ;
             this.tcpClient = tcpClient ;
 			
-			ConnectionTypeAndRequest connectionTypeAndRequest = new ConnectionTypeAndRequest ( this.requestHeader ) ;
-            this.connectionType = connectionTypeAndRequest.connectionType ;
-            this.uri = connectionTypeAndRequest.uri ;
 			if ( this.error == null )
-				this.error = uri == null ? new FormatException ( "Invalid uri: \"" + connectionTypeAndRequest.path + "\"" ) : null ;
+				if ( this.request.uri == null )
+					try
+					{
+						throw ( string.IsNullOrEmpty ( request.path ) ?
+							new FormatException ( "Cannot read header" ) :
+							new FormatException ( "Invalid uri: \"" + request.path + "\"" ) ) ;
+					}
+					catch ( Exception x )
+					{
+						this.error = x ;
+					}
 
 			this.created = DateTime.Now ;
 			this.responseHeader = "" ;
         }
 		
-
-		public override string ToString()
-		{
-			return ( requestHeader == null ? "!" : requestHeader.Replace ( "\r\n" , " " ) ) + 
-				( error == null ? "" : error.InnerException == null ? error.Message : error.InnerException.Message ) + " " +
-				created.ToString ( "yyyy-MM-hh dd:HH:ss" ) + "   " + ( origin == null ? "?" : origin.ToString () ) + "  ->  " + responseHeader  ;
-		}
 		public virtual bool isDisposed
 		{
 			get ;
@@ -128,5 +107,6 @@ namespace WebSockets
 			}
 			catch { }
 		}
+		
 	}
 }

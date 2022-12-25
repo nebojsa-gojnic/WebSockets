@@ -68,8 +68,8 @@
     <Compile Include="Common\WebSocketOpCode.cs" />
     <Compile Include="Exceptions\ServerListenerSocketException.cs" />
     <Compile Include="Exceptions\WebSocketHandshakeFailedException.cs" />
-    <Compile Include="Server\ConnectionType.cs" />
-    <Compile Include="Server\ConnectionTypeAndRequest.cs" />
+    <Compile Include="Server\HttpConnectionType.cs" />
+    <Compile Include="Server\Http\HttpRequestData.cs" />
     <Compile Include="Server\ErrorAndUriEventArgs.cs" />
     <Compile Include="Server\Http\BadRequestService.cs" />
     <Compile Include="Server\Http\FileHttpService.cs" />

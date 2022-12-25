@@ -226,8 +226,16 @@ namespace WebSockets
 			Byte[] bytes = Encoding.ASCII.GetBytes ( response ) ;
 			stream.Write ( bytes , 0 , bytes.Length ) ;
 		}
+		/// <summary>
+		/// Returns header string form begining of the given stream.
+		/// <br/>It returns empty string for the null stream.
+		/// </summary>
+		/// <param name="stream">Readable stream(after decryption)</param>
+		/// <returns></returns>
+		/// <exception cref="EntityTooLargeException"></exception>
 		public static string ReadHttpHeader ( Stream stream )
         {
+			if ( stream == null ) return "" ;
             int length = 1024*16 ; // 16KB buffer more than enough for http header
             byte[] buffer = new byte [ length ] ;
             int offset = 0;

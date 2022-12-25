@@ -26,7 +26,8 @@ namespace WebSockets
 		/// <summary>
 		/// All already requested mime types are stored in this dictionary.
 		/// <br/>If a folder does not exists in the dictionary key list it means it has not been demaned yet.
-		/// <br/>If a folder exists in the dictionary but there are no mime types defined 
+		/// <br/>If folder exists in the dictionary but there are no mime types file then parent mime type definition will be used.
+		/// <br/>It there are no root folder mime definition file then default mime types will be used(see MimeTypes.getDefaultMimeTypeValues())
 		/// </summary>
         private MimeTypeDictionary mimeTypesByFolder ;
 
@@ -45,7 +46,7 @@ namespace WebSockets
 		protected EventHandler _started ;
 		protected EventHandler _stoped ;
 		protected EventHandler<HttpConnectionDetails> _connectionErrorRaised ;
-		protected EventHandler<ErrorAndUriEventArgs> _criticalErrorRaised ;
+		protected EventHandler<HttpConnectionDetails> _criticalErrorRaised ;
 		public bool isListening 
 		{
 			get ;
@@ -63,7 +64,7 @@ namespace WebSockets
 																EventHandler startedEventHandle ,
 																EventHandler stopedEventHandle ,
 																EventHandler<HttpConnectionDetails> connectionErrorEventHandler ,
-																EventHandler<ErrorAndUriEventArgs> criticalErrorEventHandler ,
+																EventHandler<HttpConnectionDetails> criticalErrorEventHandler ,
 																EventHandler disposedEventHandle ) : 
 								   this ( serviceFactory , null , clientConnectedEventHandler , serverRespondedEventHandler , 
 									   startedEventHandle  , stopedEventHandle , connectionErrorEventHandler , criticalErrorEventHandler , disposedEventHandle )
@@ -78,7 +79,7 @@ namespace WebSockets
 						EventHandler<HttpConnectionDetails> serverRespondedEventHandler ,
 						EventHandler startedEventHandle , EventHandler stopedEventHandle , 
 						EventHandler<HttpConnectionDetails> connectionErrorEventHandler , 
-						EventHandler<ErrorAndUriEventArgs> criticalErrorEventHandler ,
+						EventHandler<HttpConnectionDetails> criticalErrorEventHandler ,
 						EventHandler disposedEventHandler )
         {
             this.serviceFactory = serviceFactory ;
@@ -150,7 +151,7 @@ namespace WebSockets
 					if ( _isDisposed ) return ;
 					if ( isListening ) StartAccept() ; //!!!
 					connectionDetails = new HttpConnectionDetails ( tcpClient , sslCertificate , sslProtocol ) ;
-                    _logger?.Information(this.GetType(), "Server: Connection opened");
+                    _logger?.Information ( GetType() , "Server: Connection opened" ) ;
 
                     // get a secure or insecure stream
                    
@@ -187,7 +188,6 @@ namespace WebSockets
 					else _connectionErrorRaised?.Invoke ( this , connectionDetails ) ;
                     
                 }
-
                 _logger?.Information ( this.GetType() , "Server: Connection closed" ) ;
             }
             catch ( ObjectDisposedException )
@@ -199,8 +199,7 @@ namespace WebSockets
                 _logger?.Error ( this.GetType(), ex ) ;
 				try
 				{
-					_criticalErrorRaised?.Invoke ( this , 
-						new ErrorAndUriEventArgs ( connectionDetails == null ? null : connectionDetails.uri , ex ) ) ;
+					_criticalErrorRaised?.Invoke ( this , connectionDetails == null ? new HttpConnectionDetails ( null , ex ) : connectionDetails ) ;
 				}
 				catch { }
 				Stop ( true ) ;
@@ -254,7 +253,7 @@ namespace WebSockets
 			add => _connectionErrorRaised += value ;
 			remove => _connectionErrorRaised -= value ;
 		}
-		public event EventHandler<ErrorAndUriEventArgs> criticalErrorRaised 
+		public event EventHandler<HttpConnectionDetails> criticalErrorRaised 
 		{
 			add => _criticalErrorRaised += value ;
 			remove => _criticalErrorRaised -= value ;
