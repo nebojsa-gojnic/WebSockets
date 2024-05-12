@@ -7,7 +7,8 @@ using System.IO ;
 using System.Reflection ;
 using System.Configuration ;
 using System.Xml ;
-
+using Newtonsoft.Json.Linq ;
+using Newtonsoft.Json ;
 namespace WebSockets 
 {
 	/// <summary>
@@ -15,32 +16,104 @@ namespace WebSockets
 	/// </summary>
     public class FileHttpService : HttpServiceBase
     {
-       	/// <summary>
-		/// Web root path
-		/// </summary>
-		protected string _webroot ;
 		/// <summary>
-		/// Creates new instance of FileHttpService class
+		/// Config data for FileHttpService class
 		/// </summary>
-		/// <param name="stream">Stream to read data from</param>
-		/// <param name="requestedPath">Requested path</param>
-		/// <param name="webroot">Web root path</param>
-		/// <param name="logger">IWebSocketLogger instance or null</param>
-		/// <param name="charset">Value of "charset" (sub)attribute in "Content-Type" response header attribute</param>
-        public FileHttpService ( Stream stream , Uri requestedPath , string webroot , IWebSocketLogger logger )
-        {
-            _stream = stream ;
-            _requestedPath = requestedPath ;
-            _webroot = webroot ;
-            _logger = logger ;
-        }
+		public class FileHttpServiceData:JObject
+		{
+			/// <summary>
+			/// Auxiliary variable for the webroot property
+			/// </summary>
+			protected string _webroot ;
+			/// <summary>
+			/// Webroot folder 
+			/// </summary>
+			public string webroot 
+			{
+				get => _webroot ;
+			}
+			/// <summary>
+			/// Creates new empty instance of FileHttpServiceData class 
+			/// </summary>
+			public FileHttpServiceData (  )
+			{
+				_webroot = "" ;
+			}
+			/// <summary>
+			/// Creates new instance of FileHttpServiceData class 
+			/// </summary>
+			/// <param name="webroot">Webroot folder </param>
+			public FileHttpServiceData ( string webroot )
+			{
+				_webroot = webroot ;
+				Add ( "webroot" , webroot ) ;
+			}
+			/// <summary>
+			/// Creates new instance of FileHttpServiceData class 
+			/// </summary>
+			/// <param name="webroot">Webroot folder </param>
+			public FileHttpServiceData ( JObject obj )
+			{
+				loadFromJSON ( obj ) ;
+			}
+			/// <summary>
+			/// Loads FileHttpService.FileHttpServiceData object with data from json string
+			/// </summary>
+			/// <param name="json">JSON string</param>
+			public virtual void loadFromJSON ( JObject obj ) 
+			{ 
+				JToken token = obj [ "webroot" ] ;
+				if ( token == null )
+					throw new InvalidDataException ( "Key \"webroot\" not found in JSON data" ) ;
+				if ( token.Type == JTokenType.String )
+					_webroot = token.ToObject<string>() ;
+				else throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"webroot\"" ) ;
+			}
+			/// <summary>
+			/// Saves FileHttpService.FileHttpServiceData object to json string
+			/// </summary>
+			/// <param name="json">JSON string</param>
+			public virtual void saveToJSON ( out string json ) 
+			{ 
+				json = "{ \"webroot\":" + ( webroot == null ? "" : JsonConvert.SerializeObject ( webroot ) ) + " }" ;
+			}
+		}
 
+		/// <summary>
+		/// Auxiliary variable for the fileConfigData 
+		/// </summary>
+		protected FileHttpServiceData _fileConfigData;
+		/// <summary>
+		/// Config data (webroot)
+		/// </summary>
+		public virtual FileHttpServiceData fileConfigData
+		{
+			get => _fileConfigData;
+		}
+		/// <summary>
+		/// Init new instance 
+		/// </summary>
+		/// <param name="server">WebServer instance</param>
+		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="configData">(FileHttpServiceData)</param>
+		public override void init ( WebServer server, HttpConnectionDetails connection , JObject configData )
+		{
+			if ( configData == null )
+				_fileConfigData = new FileHttpServiceData () ;
+			else 
+			{
+				_fileConfigData = configData as FileHttpServiceData ;
+				if ( _fileConfigData == null ) _fileConfigData = new FileHttpServiceData ( configData ) ;
+			}
+			base.init ( server , connection , configData ) ;
+
+		}
 		/// <summary>
 		/// Checks if given file path exists as folder
 		/// </summary>
 		/// <param name="filePath">File or folder path</param>
 		/// <returns>Returns true if given file path exists as folder, otherwise false</returns>
-        private static bool IsDirectory ( string filePath )
+		private static bool IsDirectory ( string filePath )
         {
             if ( Directory.Exists ( filePath ) )
             {
@@ -64,8 +137,7 @@ namespace WebSockets
 			FileStream fileStream = null ;
 			try
 			{
-				_logger?.Information ( GetType( ), "Request: {0}" , _requestedPath ) ;
-				string fullFileNamePath = getSafePath ( _webroot , _requestedPath.LocalPath ) ;
+				string fullFileNamePath = getSafePath ( fileConfigData.webroot , connection.request.uri.LocalPath ) ;
 				int i = fullFileNamePath.IndexOf ( '?' ) ;
 				string queryString = "" ;
 				if ( i >= 0 )
@@ -91,17 +163,17 @@ namespace WebSockets
 
 					MimeTypeAndCharset contentTypeAndCharset ;
 					
-					if ( mimeTypesByFolder.getMimeTypes ( this , _requestedPath ).TryGetValue ( ext , out contentTypeAndCharset ) )
+					if ( mimeTypesByFolder.getMimeTypes ( this , connection.request.uri ).TryGetValue ( ext , out contentTypeAndCharset ) )
 					{
-						/*
-						Byte[] bytes = File.ReadAllBytes ( fullFileNamePath ) ;
-						responseHeader = RespondSuccess ( contentType, bytes.Length ) ;
-						_stream.Write ( bytes, 0, bytes.Length ) ;
-						*/
+						
+						//Byte[] bytes = File.ReadAllBytes ( fullFileNamePath ) ;
+						//responseHeader = RespondSuccess ( contentTypeAndCharset , bytes.Length ) ;
+						//connection.stream.Write ( bytes, 0, bytes.Length ) ;
+
 						int buffSize = 65536 ;
 						Byte [ ] buffer = new byte [ buffSize ] ;
-						responseHeader = RespondChunkedSuccess ( contentTypeAndCharset ) ;
 						fileStream = File.OpenRead ( fullFileNamePath ) ;
+						responseHeader = connection.request.method.Trim().ToUpper() == "POST" ? RespondChunkedCreated ( contentTypeAndCharset  ) : RespondChunkedSuccess ( contentTypeAndCharset ) ;
 						int r = fileStream.Read ( buffer , 0 , buffSize ) ;
 						while ( r == buffSize )
 						{
@@ -110,17 +182,11 @@ namespace WebSockets
 						}
 						WriteChunk ( buffer , r ) ;
 						WriteFinalChunk () ;
-						fileStream.Flush () ;
+
+						connection.tcpClient.Client.Shutdown ( SocketShutdown.Send ) ;
 						fileStream.Close () ;
 						fileStream.Dispose () ;
-						_logger?.Information ( this.GetType() , "Served file: {0}" , fullFileNamePath ) ;
 						return true ;
-						// delete zip files once served
-						//if (contentType == "application/zip")
-						//{
-						//  //  File.Delete(fi.FullName);
-						//   // _logger?.Information(this.GetType(), "Deleted file: {0}", file);
-						//}
 					}
 					else responseHeader = RespondMimeTypeFailure ( fullFileNamePath );
 				}
@@ -150,7 +216,7 @@ namespace WebSockets
 		/// <returns>Returns open file stream or null</returns>
 		public override Stream GetResourceStream ( Uri uri ) 
 		{
-			string fullFileNamePath = getSafePath ( _webroot , uri.LocalPath ) ;
+			string fullFileNamePath = getSafePath ( fileConfigData.webroot , uri.LocalPath ) ;
 			int i = fullFileNamePath.IndexOf ( '?' ) ;
 			string queryString = "" ;
 			if ( i >= 0 )

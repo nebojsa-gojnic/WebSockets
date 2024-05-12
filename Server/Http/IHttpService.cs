@@ -1,6 +1,8 @@
 ﻿using System ;
 using System.IO;
-
+using System.Net.Sockets;
+using Newtonsoft.Json.Linq ;
+using Newtonsoft.Json ;
 namespace WebSockets
 {
 	/// <summary>
@@ -21,18 +23,39 @@ namespace WebSockets
 		/// </summary>
 		/// <param name="uri">Target uri</param>
 		/// <returns>stream to resource specified by given uri</returns>
-		Stream GetResourceStream ( Uri uri ) ;
+		Stream GetResourceStream ( Uri uri );
 
-		/// <summary>
-		/// Stream instance to read request from (not necessarily same as original network stream)
-		/// </summary>
-	    Stream stream { get ; }
+		
+
 		
 		/// <summary>
-		/// Requested path
+		/// This should be set in Dispose() method
 		/// </summary>
-        Uri requestedPath { get ; }
+		bool isDisposed { get ; } 
+		/// <summary>
+		/// Connection data(HttpConnectionDetails)
+		/// </summary>
+		HttpConnectionDetails connection { get ; }
 
+
+		/// <summary>
+		/// WebServer instance this service belongs to.
+		/// </summary>
+		WebServer server { get ; }
+
+
+		/// <summary>
+		/// Anything
+		/// </summary>
+		JObject configData { get ; }
+
+		/// <summary>
+		/// Init new instance 
+		/// </summary>
+		/// <param name="server">WebServer instance</param>
+		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="configData">Anything</param>
+		void init ( WebServer server , HttpConnectionDetails connection , JObject configData ) ;
 
     }
 }

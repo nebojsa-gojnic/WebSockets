@@ -20,7 +20,6 @@ namespace WebSockets
 		protected void setResponseHeader ( string  value ) 
 		{
 			_responseHeader = value ;
-			toStringDirty = true ;
 		}
 		public string responseHeader 
 		{ 
@@ -31,10 +30,6 @@ namespace WebSockets
 		public HttpRequestData request { get ; private set ; }
 		public SslProtocols sslProtocol { get ; internal set ; }
 		public X509Certificate2 sslCertificate { get ; internal set ; }
-		/// <summary>
-		/// When this flag is up ToString method must create new return value and store it into the _ToString variable
-		/// </summary>
-		protected bool toStringDirty ;
 		
 		public static Stream GetStream ( TcpClient tcpClient , X509Certificate2 sslCertificate , SslProtocols sslProtocol )
         {
@@ -45,7 +40,20 @@ namespace WebSockets
             sslStream.AuthenticateAsServer ( sslCertificate , false , sslProtocol , true ) ;
             return sslStream ;
         }
-		public HttpConnectionDetails ( Uri uri, Exception errorOnly ) 
+		public HttpConnectionDetails ( HttpConnectionDetails source , Exception error ) 
+		{
+            this.stream = source.stream ;
+            this.tcpClient = source.tcpClient ;
+			this.request = source.request ;
+			this.created = source.created ;
+			this.origin = source.origin ;
+			this.responseHeader = "" ;
+			this.error = error ;
+		} 
+		public HttpConnectionDetails ( Exception errorOnly ) : this ( (Uri) null , errorOnly )
+		{
+		} 
+		public HttpConnectionDetails ( Uri uri , Exception errorOnly ) 
 		{
             this.stream = null ;
             this.tcpClient = null ;
@@ -54,13 +62,11 @@ namespace WebSockets
 			this.origin = null ;
 			this.responseHeader = "" ;
 			this.error = errorOnly ;
-			toStringDirty = true ;
 		} 
 		public HttpConnectionDetails ( TcpClient tcpClient , X509Certificate2 sslCertificate , SslProtocols sslProtocol ) 
         {
 			this.sslCertificate = sslCertificate ;
 			this.sslProtocol = sslProtocol ;
-			toStringDirty = true ;
 			//this.mimeTypes = mimeTypes ;
 			try
 			{

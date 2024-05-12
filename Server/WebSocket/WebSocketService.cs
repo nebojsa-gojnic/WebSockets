@@ -1,63 +1,205 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Net.Sockets;
-using System.Text.RegularExpressions;
-using System.Diagnostics;
-using System.Threading;
-using System.IO;
+﻿using System ;
+using System.Collections.Generic ;
+using System.Security.Cryptography ;
+using System.Linq ;
+using System.Text ;
+using System.Net.Sockets ;
+using System.Text.RegularExpressions ;
+using System.Diagnostics ;
+using System.Threading ;
+using System.IO ;
+using Newtonsoft.Json.Linq ;
+using Newtonsoft.Json ;
 
 namespace WebSockets
 {
     public class WebSocketService : WebSocketBase , IHttpService
     {
-        private readonly Stream _stream ;
-        private readonly string _header ;
-        private readonly IWebSocketLogger _logger ;
-        private readonly TcpClient _tcpClient ;
-        private bool _isDisposed = false ;
+		///// <summary>
+		///// Auxiliary variable for the webSocketConfigData property
+		///// </summary>
+		//protected WebSocketServiceData _webSocketConfigData ;
+		///// <summary>
+		///// Returns true if this instance is disposed
+		///// </summary>
+		//public WebSocketServiceData webSocketConfigData
+		//{
+		//	get => _webSocketConfigData ;
+		//}
+		///// <summary>
+		///// Configuration data for the WebSocketService class
+		///// </summary>
+		//public class WebSocketServiceData:JObject
+		//{
+		//	/// <summary>
+		//	/// Auxiliary variable for the noDelay property
+		//	/// </summary>
+		//	protected bool _noDelay ;
+		//	/// <summary>
+		//	/// This is applied to NoDelay property of TcpClient class instance
+		//	/// </summary>
+		//	public bool noDelay 
+		//	{
+		//		get => _noDelay ;
+		//	}
+		//	/// <summary>
+		//	/// Creates new instance of WebSocketServiceData class with noDelay propety value set to false
+		//	/// </summary>
+		//	public WebSocketServiceData ( ) : this ( false )
+		//	{
+		//	}
+		//	/// <summary>
+		//	/// Creates new instance of WebSocketServiceData class
+		//	/// </summary>
+		//	/// <param name="noDelay">This is applied to NoDelay property of TcpClient class instance</param>
+		//	public WebSocketServiceData ( bool noDelay )
+		//	{
+		//		_noDelay = noDelay ;	
+		//	}
+		//	/// <summary>
+		//	/// Loads WebSocketService.WebSocketServiceData object with data from json string
+		//	/// </summary>
+		//	/// <param name="json">JSON string</param>
+		//	public override void loadFromJSON ( string json ) 
+		//	{ 
+		//		JObject jo = ( JObject ) JsonConvert.DeserializeObject ( json ) ;
+		//		JToken token = jo [ "noDelay" ] ;
+		//		if ( token == null )
+		//			throw new InvalidDataException ( "Key \"noDelay\" not found in JSON data" ) ;
+		//		switch ( token.Type )
+		//		{
+		//			case JTokenType.String :
+		//				switch ( token.ToObject<string>().ToLower() )
+		//				{
+		//					case "ni" :
+		//					case "ne" :
+		//					case "no" :
+		//					case "false" :
+		//					case "" :
+		//						_noDelay = false ;
+		//					break ;
+		//					default :
+		//						_noDelay = true ;
+		//					break ;
+		//				}
+		//			break ;
+		//			case JTokenType.Boolean :
+		//				_noDelay = token.ToObject<bool>() ;
+		//			break ;
+		//			case JTokenType.Integer :
+		//				_noDelay = token.ToObject<int>() != 0 ;
+		//			break ;
+		//			case JTokenType.Float :
+		//				_noDelay = token.ToObject<double>() != 0 ;
+		//			break ;
+		//			default:
+		//				throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"noDelay\"" ) ;
+		//		}
+		//	}
+		//	/// <summary>
+		//	/// Saves FileHttpService.FileHttpServiceData object to json string
+		//	/// </summary>
+		//	/// <param name="json">JSON string</param>
+		//	public override void saveToJSON ( out string json ) 
+		//	{ 
+		//		json = "{ \"noDelay\":" + JsonConvert.SerializeObject ( noDelay ) + " }" ;
+		//	}
+		//}
 		/// <summary>
-		/// Stream instance to read request from (not necessarily same as original network stream)
+		/// Auxiliary variable for the connection property
 		/// </summary>
-		public Stream stream 
+	    protected HttpConnectionDetails _connection ;
+		
+		/// <summary>
+		/// Connection data(HttpConnectionDetails)
+		/// </summary>
+		public virtual HttpConnectionDetails connection 
 		{
-			get => _stream ;
+			get => _connection ;
+		}
+
+	
+
+		/// <summary>
+		/// Auxiliary variable for the configData property
+		/// </summary>
+	    protected JObject _configData ;
+		/// <summary>
+		/// Anything
+		/// </summary>
+		public virtual JObject configData
+		{
+			get => _configData ;
 		}
 
 		/// <summary>
-		/// Requested path
+		/// Auxiliary variable for the server property
 		/// </summary>
-        protected Uri _requestedPath ;
-
+	    protected WebServer _server ;
 		/// <summary>
-		/// Requested path
+		/// WebServer instance this service belongs to.
 		/// </summary>
-        public Uri requestedPath 
+		public virtual WebServer server
 		{
-			get => _requestedPath ;
+			get => _server ;
 		}
 
-        public WebSocketService ( Stream stream , TcpClient tcpClient , string header , bool noDelay , IWebSocketLogger logger ) : base ( logger )
-        {
-            _stream = stream ;
-            _header = header ;
-            _logger = logger ;
-            _tcpClient = tcpClient ;
-
-            // send requests immediately if true (needed for small low latency packets but not a long stream). 
-            // Basically, dont wait for the buffer to be full before before sending the packet
-            tcpClient.NoDelay = noDelay ;
-        }
-
-        public bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
+		/// <summary>
+		/// Init new instance 
+		/// </summary>
+		/// <param name="server">WebServer instance</param>
+		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="configData">(FileHttpServiceData)</param>
+		public virtual void init ( WebServer server , HttpConnectionDetails connection , JObject configData )
+		{
+			_server = server ;
+			//_webSocketConfigData = configData as WebSocketServiceData ;
+			//if ( _webSocketConfigData == null ) _webSocketConfigData = new WebSocketServiceData () ;
+			_configData = configData ;
+			
+			if ( configData != null )
+			{
+				JToken token = configData [ "noDelay" ] ;
+				if ( token == null )
+					throw new InvalidDataException ( "Key \"noDelay\" not found in JSON data" ) ;
+				switch ( token.Type )
+				{
+					case JTokenType.String :
+						switch ( token.ToObject<string>().ToLower() )
+						{
+							case "ni" :
+							case "ne" :
+							case "no" :
+							case "false" :
+							case "" :
+								connection.tcpClient.NoDelay = false ;
+							break ;
+							default :
+								connection.tcpClient.NoDelay = true ;
+							break ;
+						}
+					break ;
+					case JTokenType.Boolean :
+						connection.tcpClient.NoDelay = token.ToObject<bool>() ;
+					break ;
+					case JTokenType.Integer :
+						connection.tcpClient.NoDelay = token.ToObject<int>() != 0 ;
+					break ;
+					case JTokenType.Float :
+						connection.tcpClient.NoDelay = token.ToObject<double>() != 0 ;
+					break ;
+					default:
+						throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"noDelay\"" ) ;
+				}	
+			}
+		}
+        public virtual bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
         {
 			responseHeader = "" ; 
 			codeError = null ;
 			try
 			{ 
-				base.OpenBlocking ( _stream , _tcpClient.Client , false ) ;
+				base.OpenBlocking ( connection.stream , connection.tcpClient.Client , false ) ;
 				return true ;
 			}
 			catch ( Exception x )
@@ -66,10 +208,9 @@ namespace WebSockets
 			}
             return false ;
         }
-
-        protected override void PerformHandshake(Stream stream)
+        protected override void PerformHandshake ( Stream stream )
         {
-            string header = _header;
+            string header = connection.request.header ;
 
             try
             {
@@ -92,7 +233,6 @@ namespace WebSockets
                                    + "Sec-WebSocket-Accept: " + setWebSocketAccept);
 
                 HttpServiceBase.WriteHttpHeader(response, stream);
-                _logger.Information(this.GetType(), "Web Socket handshake sent");
             }
             catch (WebSocketVersionNotSupportedException)
             {
@@ -113,10 +253,10 @@ namespace WebSockets
             socket.Close();
         }
 
-        public virtual void Dispose()
+        public override void Dispose()
         {
             // send special web socket close message. Don't close the network stream, it will be disposed later
-            if (_stream.CanWrite && !_isDisposed)
+            if ( connection.stream.CanWrite && !_isDisposed )
             {
                 using (MemoryStream stream = new MemoryStream())
                 {
@@ -127,10 +267,10 @@ namespace WebSockets
                     Send(WebSocketOpCode.ConnectionClose, stream.ToArray());
                 }
 
-                _isDisposed = true;
-                _logger.Information(this.GetType(), "Sent web socket close message to client");
-                CloseConnection(_tcpClient.Client);
+                CloseConnection ( connection.tcpClient.Client ) ;
+				base.Dispose() ;
             }
+			
         }
 		/// <summary>
 		/// Returns null!!
@@ -144,7 +284,6 @@ namespace WebSockets
         protected override void OnConnectionClose(byte[] payload)
         {
             Send(WebSocketOpCode.ConnectionClose, payload);
-            _logger.Information(this.GetType(), "Sent response close message to client");
             _isDisposed = true;
 
             base.OnConnectionClose(payload);

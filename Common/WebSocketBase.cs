@@ -9,9 +9,13 @@ using System.IO;
 
 namespace WebSockets
 {
-    public abstract class WebSocketBase
+	/// <summary>
+	/// This is base class for both WebSockerClient and WebSockerService
+	/// </summary>
+    public abstract class WebSocketBase : IDisposable
     {
-        private readonly IWebSocketLogger _logger;
+
+		
         private readonly object _sendLocker;
         private Stream _stream;
         private WebSocketFrameWriter _writer;
@@ -28,9 +32,8 @@ namespace WebSockets
         public event EventHandler<BinaryFrameEventArgs> BinaryFrame;
         public event EventHandler<BinaryMultiFrameEventArgs> BinaryMultiFrame;
 
-        public WebSocketBase(IWebSocketLogger logger)
+        public WebSocketBase()
         {
-            _logger = logger;
             _sendLocker = new object();
             _isOpen = false;
         }
@@ -137,14 +140,14 @@ namespace WebSockets
         {
             ConnectionCloseEventArgs args = GetConnectionCloseEventArgsFromPayload(payload);
 
-            if (args.Reason == null)
-            {
-                _logger.Information(this.GetType(), "Received web socket close message: {0}", args.Code);
-            }
-            else
-            {
-                _logger.Information(this.GetType(), "Received web socket close message: Code '{0}' Reason '{1}'", args.Code, args.Reason);
-            }
+            //if (args.Reason == null)
+            //{
+            //    _logger.Information(this.GetType(), "Received web socket close message: {0}", args.Code);
+            //}
+            //else
+            //{
+            //    _logger.Information(this.GetType(), "Received web socket close message: Code '{0}' Reason '{1}'", args.Code, args.Reason);
+            //}
 
             if (ConnectionClose != null)
             {
@@ -193,7 +196,7 @@ namespace WebSockets
                     }
                     catch (InvalidCastException)
                     {
-                        _logger.Warning(this.GetType(), "Close code {0} not recognised", code);
+                        //_logger.Warning(this.GetType(), "Close code {0} not recognised", code);
                         return new ConnectionCloseEventArgs(WebSocketCloseCode.Normal, null);
                     }
                 }
@@ -284,6 +287,25 @@ namespace WebSockets
                     }
                 }
             }
+        }
+		/// <summary>
+		/// Axuiliary variable for the isDisposed property
+		/// </summary>
+		protected bool _isDisposed ;
+		/// <summary>
+		/// This is true when object is disposed
+		/// </summary>
+		public bool isDisposed
+		{
+			get => isDisposed ;
+		}
+		/// <summary>
+		/// This method set isDisposed property value.
+		/// <br/>It should be called by new Dispose() method if overrided in order to set isDisposed property value.
+		/// </summary>
+        public virtual void Dispose()
+        {
+			_isDisposed = true ;
         }
     }
 }

@@ -13,16 +13,64 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates ;
 using System.Security.Cryptography;
 using System.Linq.Expressions ;
-
-
+using System.Runtime.Serialization ;
+using System.Collections.ObjectModel ;
+using Newtonsoft.Json.Linq ;
+using Newtonsoft.Json ;
 namespace WebSockets
 {
     public class WebServer : IDisposable
     {
-        // maintain a list of open connections so that we can notify the client if the server shuts down
+		/// <summary>
+		/// maintain a list of open connections so that we can notify the client if the server shuts down
+		/// </summary>
         private readonly List<IDisposable> _openConnections ;
-		public readonly IHttpServiceFactory serviceFactory ;
-        private readonly IWebSocketLogger _logger ;
+		/// <summary>
+		/// Path manager
+		/// </summary>
+		protected PathManager pathManager  ;
+		/// <summary>
+		/// Auxiliary variable for the paths property
+		/// </summary>
+		public ReadOnlyDictionary <PathDefinition,HttpServiceActivator> _paths ;
+		/// <summary>
+		/// Read only paths/serviceServices dictionary
+		/// </summary>
+		public IReadOnlyDictionary <PathDefinition,HttpServiceActivator> paths 
+		{
+			get => _paths ;
+		}
+		/// <summary>
+		/// Adds or replace exisiting path and its service
+		/// </summary>
+		/// <param name="path">Path string(with jokers)</param>
+		/// <param name="serviceType">Real type for IHttpService instance</param>
+		/// <returns>Returns true if path and service addes as new item, 
+		/// <br/>returns false existing path updated with new IHttpService instance.</returns>
+		public virtual bool addPath ( string path , int severity , string activatorName , Type serviceType , JObject configData )
+		{
+			return pathManager.add ( new PathDefinition ( path , severity ) , new HttpServiceActivator ( activatorName , serviceType , configData ) ) ; 
+		}
+		/// <summary>
+		/// Adds or replace exisiting path and its service
+		/// </summary>
+		/// <param name="path">Path string(with jokers)</param>
+		/// <param name="activator">HttpServiceActivator instance</param>
+		/// <returns>Returns true if path and service addes as new item, 
+		/// <br/>returns false existing path updated with new IHttpService instance.</returns>
+		public virtual bool addPath ( string path , int severity , HttpServiceActivator activator )
+		{
+			return pathManager.add ( new PathDefinition ( path , severity ) , activator ) ; 
+		}
+		/// <summary>
+		/// Returns first activator for given path, ignores severity.
+		/// </summary>
+		/// <param name="path">string</param>
+		/// <returns></returns>
+		public KeyValuePair<PathDefinition,HttpServiceActivator> getActivator ( string path )
+		{
+			return pathManager [ path ] ;
+		}
 		/// <summary>
 		/// All already requested mime types are stored in this dictionary.
 		/// <br/>If a folder does not exists in the dictionary key list it means it has not been demaned yet.
@@ -30,12 +78,17 @@ namespace WebSockets
 		/// <br/>It there are no root folder mime definition file then default mime types will be used(see MimeTypes.getDefaultMimeTypeValues())
 		/// </summary>
         private MimeTypeDictionary mimeTypesByFolder ;
-
+		/// <summary>
+		/// SSL certificate
+		/// </summary>
         public X509Certificate2 sslCertificate 
 		{
 			get ;
 			protected set ;
 		}
+		/// <summary>
+		/// TLS protocol in use
+		/// </summary>
 		public SslProtocols sslProtocol 
 		{
 			get ;
@@ -58,23 +111,10 @@ namespace WebSockets
 		}
 		
 		private bool _isDisposed = false;
-
-        public WebServer ( IHttpServiceFactory serviceFactory , EventHandler<HttpConnectionDetails> clientConnectedEventHandler , 
-																EventHandler<HttpConnectionDetails> serverRespondedEventHandler ,
-																EventHandler startedEventHandle ,
-																EventHandler stopedEventHandle ,
-																EventHandler<HttpConnectionDetails> connectionErrorEventHandler ,
-																EventHandler<HttpConnectionDetails> criticalErrorEventHandler ,
-																EventHandler disposedEventHandle ) : 
-								   this ( serviceFactory , null , clientConnectedEventHandler , serverRespondedEventHandler , 
-									   startedEventHandle  , stopedEventHandle , connectionErrorEventHandler , criticalErrorEventHandler , disposedEventHandle )
-        {
-        }
-        public WebServer ( IHttpServiceFactory serviceFactory , IWebSocketLogger logger ) : 
-			this ( serviceFactory , logger , null , null , null , null , null , null , null )
-        {
-        }
-        public WebServer ( IHttpServiceFactory serviceFactory , IWebSocketLogger logger , 
+		public WebServer ( ) : this ( null , null , null , null , null , null , null ) 
+		{
+		}
+        public WebServer ( 
 						EventHandler<HttpConnectionDetails> clientConnectedEventHandler , 
 						EventHandler<HttpConnectionDetails> serverRespondedEventHandler ,
 						EventHandler startedEventHandle , EventHandler stopedEventHandle , 
@@ -82,9 +122,9 @@ namespace WebSockets
 						EventHandler<HttpConnectionDetails> criticalErrorEventHandler ,
 						EventHandler disposedEventHandler )
         {
-            this.serviceFactory = serviceFactory ;
-            _logger = logger;
-            _openConnections = new List<IDisposable>();
+			pathManager = new PathManager () ;
+			_paths = new ReadOnlyDictionary<PathDefinition,HttpServiceActivator> ( pathManager ) ;
+			_openConnections = new List<IDisposable>();
 			_clientConnected = clientConnectedEventHandler ;
 			_serverResponded = serverRespondedEventHandler ;	
 			_started = startedEventHandle ;
@@ -95,21 +135,41 @@ namespace WebSockets
 			isListening = false ;
 			mimeTypesByFolder = new MimeTypeDictionary () ;
         }
+		/// <summary>
+		/// Auxiliary variable for the port property
+		/// </summary>
 		protected int _port ;
+		/// <summary>
+		/// Listener end point port.
+		/// </summary>
 		public int port 
 		{
 			get => _listener == null ? _port : ( ( IPEndPoint ) _listener.LocalEndpoint ).Port ;
 		}
-        public void Listen ( int port , X509Certificate2 sslCertificate , SslProtocols sslProtocol )
-        {
-            this.sslCertificate = sslCertificate ;
-			this.sslProtocol = sslProtocol ;
-            IPAddress localAddress = IPAddress.Any ;
-            _listener = new TcpListener ( localAddress , port ) ;
+		/// <summary>
+		/// Auxiliary variable for the configData property.
+		/// </summary>
+		protected WebServerConfigData _configData ;
+		/// <summary>
+		/// The WebServerConfigData instance this server execution is based on
+		/// </summary>
+		public WebServerConfigData configData 
+		{
+			get => _configData ;
+		}
+		public void Listen ( WebServerConfigData configData )
+		{
+			if ( isListening ) throw new ApplicationException ( "Server already started" ) ;
+			_configData = configData ;
+			pathManager.Clear () ;
+			foreach ( KeyValuePair<PathDefinition,HttpServiceActivator> pair in configData.paths )
+				pathManager.Add ( pair.Key , pair.Value ) ;
+            this.sslCertificate = configData.sslCertificate ;
+			this.sslProtocol = configData.sslProtocol ;
+			_port = configData.port ;
+            _listener = new TcpListener ( IPAddress.Any , configData.port ) ;
             _listener.Start() ;
 			isListening = true ;
-            _logger?.Information ( GetType() , "Server started listening on port {0}" , port ) ;
-			_port = port ;
 			_started?.Invoke ( this , new EventArgs () ) ;
             StartAccept() ;
             //catch (SocketException ex)
@@ -119,13 +179,13 @@ namespace WebSockets
             //}
         }
 
-        /// <summary>
-        /// Listens on the port specified
-        /// </summary>
-        public void Listen ( int port )
-        {
-            Listen ( port , null , SslProtocols.None ) ;
-        }
+        ///// <summary>
+        ///// Listens on the port specified
+        ///// </summary>
+        //public void Listen ( int port )
+        //{
+        //    Listen ( port , null , SslProtocols.None ) ;
+        //}
 
 
         private void StartAccept()
@@ -151,7 +211,7 @@ namespace WebSockets
 					if ( _isDisposed ) return ;
 					if ( isListening ) StartAccept() ; //!!!
 					connectionDetails = new HttpConnectionDetails ( tcpClient , sslCertificate , sslProtocol ) ;
-                    _logger?.Information ( GetType() , "Server: Connection opened" ) ;
+                    //_logger?.Information ( GetType() , "Server: Connection opened" ) ;
 
                     // get a secure or insecure stream
                    
@@ -161,7 +221,22 @@ namespace WebSockets
 					if ( connectionDetails.error == null )
 					{
 						_clientConnected?.Invoke ( this , connectionDetails ) ;
-						IHttpService service = this.serviceFactory.CreateInstance ( connectionDetails ) ;
+						IHttpService service = null ;
+						try
+						{
+							service = pathManager.createService ( this , connectionDetails ) ;
+						}
+						catch ( Exception x )
+						{ 
+							_connectionErrorRaised?.Invoke ( this , new HttpConnectionDetails ( connectionDetails , x ) ) ;
+						}
+						if ( service == null ) 
+						{
+							service = new BadRequestService () ;
+							service.init ( this , connectionDetails , null ) ;
+							_connectionErrorRaised?.Invoke ( this , new HttpConnectionDetails ( connectionDetails , new SerializationException ( "No path match \"" + connectionDetails.request.uri.LocalPath + "\"" ) ) ) ;						
+						}
+
 						try
 						{
 							// record the connection so we can close it if something goes wrong
@@ -176,6 +251,7 @@ namespace WebSockets
 							connectionDetails.responseHeader = responseHeader ;
 							connectionDetails.error = error ;
 							_serverResponded?.Invoke ( this , connectionDetails ) ;
+							//System.Threading.Thread.Sleep ( 2000 ) ; //!!!????!!??????
 						}
 						finally
 						{
@@ -188,7 +264,7 @@ namespace WebSockets
 					else _connectionErrorRaised?.Invoke ( this , connectionDetails ) ;
                     
                 }
-                _logger?.Information ( this.GetType() , "Server: Connection closed" ) ;
+                //_logger?.Information ( this.GetType() , "Server: Connection closed" ) ;
             }
             catch ( ObjectDisposedException )
             {
@@ -196,13 +272,16 @@ namespace WebSockets
             }
             catch ( Exception ex )
             {
-                _logger?.Error ( this.GetType(), ex ) ;
-				try
+                //_logger?.Error ( this.GetType(), ex ) ;
+				if ( isListening ) 
 				{
-					_criticalErrorRaised?.Invoke ( this , connectionDetails == null ? new HttpConnectionDetails ( null , ex ) : connectionDetails ) ;
+					try
+					{
+						_criticalErrorRaised?.Invoke ( this , connectionDetails == null ? new HttpConnectionDetails ( ex ) : connectionDetails ) ;
+					}
+					catch { }
+					Stop ( true ) ;
 				}
-				catch { }
-				Stop ( true ) ;
             }
         }
 		protected EventHandler<HttpConnectionDetails> _clientConnected ;
@@ -235,7 +314,7 @@ namespace WebSockets
                 }
                 catch ( Exception ex )
                 {
-                    _logger?.Error ( GetType() , ex ) ;
+                    //_logger?.Error ( GetType() , ex ) ;
                 }
         }
 		public event EventHandler started 
@@ -281,13 +360,13 @@ namespace WebSockets
 						if ( _listener.Server != null ) _listener.Server.Close() ;
 						_listener.Stop() ;
 					}
-					_logger?.Information ( GetType() , "Web server stoped" ) ;
+					//_logger?.Information ( GetType() , "Web server stoped" ) ;
 					_stoped?.Invoke ( this , new EventArgs () ) ;
 					return true ;
 				}
 				catch ( Exception x )
 				{ 
-					_logger?.Information ( GetType() , "Error stoping server: " + x.Message ) ;
+					//_logger?.Information ( GetType() , "Error stoping server: " + x.Message ) ;
 				}
 			}
 			if ( killConnections ) closeAllConnections () ;
@@ -305,7 +384,7 @@ namespace WebSockets
                 _isDisposed = true ;
 
                 Stop ( true ) ;
-                _logger?.Information ( GetType() , "Web server disposed" ) ;
+                //_logger?.Information ( GetType() , "Web server disposed" ) ;
 				//_disposed?.BeginInvoke ( this ,  new EventArgs () , null , null ) ;
 				_disposed?.Invoke ( this ,  new EventArgs () ) ;
             }

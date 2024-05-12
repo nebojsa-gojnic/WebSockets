@@ -8,7 +8,8 @@ using System.Net.Sockets ;
 using System.Net ;
 using System.Diagnostics ;
 using System.Runtime.Remoting.Messaging ;
-
+using Newtonsoft.Json.Linq ;
+using Newtonsoft.Json ;
 namespace WebSockets
 {
 	/// <summary>
@@ -17,22 +18,99 @@ namespace WebSockets
 	public class TestHttpService:HttpServiceBase
 	{
 		/// <summary>
-		/// Text message to bound into html
+		/// Config data for TestHttpService class
 		/// </summary>
-		protected string message ;
+		public class TestHttpServiceData:JObject
+		{
+			/// <summary>
+			/// Auxiliary variable for the message property
+			/// </summary>
+			protected string _message ;
+			/// <summary>
+			/// Message to be present on html file
+			/// </summary>
+			public string message 
+			{
+				get => _message ;
+			}
+			/// <summary>
+			/// Creates new instance of FileHttpServiceData class 
+			/// </summary>
+			/// <param name="webroot">Webroot folder </param>
+			public TestHttpServiceData ()
+			{
+				_message = "<default message>" ;
+			}
+			/// <summary>
+			/// Creates new instance of FileHttpServiceData class 
+			/// </summary>
+			/// <param name="webroot">Webroot folder </param>
+			public TestHttpServiceData ( string message )
+			{
+				_message = message ;
+			}
+			/// <summary>
+			/// Creates new instance of FileHttpServiceData class 
+			/// </summary>
+			/// <param name="webroot">Webroot folder </param>
+			public TestHttpServiceData ( JObject obj )
+			{
+				loadFromJSON ( obj ) ;
+			}
+			/// <summary>
+			/// Loads TestHttpService.TestHttpServiceData object with data from json string
+			/// </summary>
+			/// <param name="json">JSON string</param>
+			public virtual void loadFromJSON ( JObject obj ) 
+			{ 
+				//JObject jo = ( JObject ) JsonConvert.DeserializeObject ( json ) ;
+				JToken token = obj [ "message" ] ;
+				if ( token == null )
+					throw new InvalidDataException ( "Key \"message\" not found in JSON data" ) ;
+				
+				if ( token.Type == JTokenType.String )
+					_message = token.ToObject<string>() ;
+				else throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"message\"" ) ;
+			}
+			///// <summary>
+			///// Saves TestHttpService.TestHttpServiceData object to json string
+			///// </summary>
+			///// <param name="json">JSON string</param>
+			//public override void saveToJSON ( out string json ) 
+			//{ 
+			//	json = "{ \"message\":" + JsonConvert.SerializeObject ( message ) + " }" ;
+			//}
+		}
+
 		/// <summary>
-		/// Create new instance of the TestHttpService class.
+		/// Auxiliary variable for the fileConfigData 
 		/// </summary>
-		/// <param name="stream">Stream to read data from</param>
-		/// <param name="message">Text message to bound into html</param>
-		/// <param name="logger">IWebSocketLogger instance or null</param>
-		public TestHttpService ( Stream stream , string message, IWebSocketLogger logger )
-        {
-			this.message = message == null ? "" : message ;
-			_stringBuilder = new StringBuilder ( 2048 ) ;
-            _stream = stream ;
-            _logger = logger ;
-        }
+		protected TestHttpServiceData _testHttpConfigData ;
+		/// <summary>
+		/// Config data (message)
+		/// </summary>
+		public virtual TestHttpServiceData testHttpConfigData
+		{
+			get => _testHttpConfigData ;
+		}
+		/// <summary>
+		/// Init new instance 
+		/// </summary>
+		/// <param name="server">WebServer instance</param>
+		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="configData">(TestHttpServiceData)</param>
+		public override void init ( WebServer server , HttpConnectionDetails connection , JObject configData )
+		{
+			if ( configData == null )
+				_testHttpConfigData = new TestHttpServiceData ( ) ;
+			else 
+			{
+				_testHttpConfigData = configData as TestHttpServiceData ;
+				if ( _testHttpConfigData == null ) _testHttpConfigData = new TestHttpServiceData ( configData ) ;
+			}
+			
+			base.init ( server , connection , configData ) ;
+		}
 		/// <summary>
 		/// Returns entire html with message encoded in body as byte[] array
 		/// </summary>
@@ -47,7 +125,7 @@ namespace WebSockets
 		{
 			stringBuilder.Clear () ;
 			stringBuilder.Append ( "<html>\r\n\t<body>\r\n\t\t" ) ;
-			stringBuilder.Append ( WebUtility.HtmlEncode ( message ) ) ;
+			stringBuilder.Append ( WebUtility.HtmlEncode ( testHttpConfigData.message ) ) ;
 			stringBuilder.Append ( "\r\n\t</body>\r\n<html>" ) ;
 			return stringBuilder.ToString() ;
 		}
@@ -64,11 +142,10 @@ namespace WebSockets
 			codeError = null ;
 			try
 			{
-				_logger?.Information ( GetType() , "Request: {0}" , _requestedPath ) ;
 
 				byte [] buffer = getHtmlBytes() ;
 				responseHeader = RespondSuccess ( MimeTypes.html , buffer.Length , "utf-8" ) ;
-				_stream.Write ( buffer , 0 , buffer.Length ) ;
+				connection.stream.Write ( buffer , 0 , buffer.Length ) ;
 
 				return true ;
 			}

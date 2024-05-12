@@ -8,6 +8,8 @@ using System.Reflection ;
 using System.Configuration ;
 using System.Xml ;
 using System.Net.Security ;
+using Newtonsoft.Json.Linq ;
+using Newtonsoft.Json ;
 namespace WebSockets
 {
 	/// <summary>
@@ -16,34 +18,171 @@ namespace WebSockets
 	public class ResourcesHttpService : HttpServiceBase
     {
 		/// <summary>
-		/// This dictionary contains lowcase file names for keys and full resource names for values.
-		/// <br/>It speeds up search hopefully.
+		/// Config data for ResourcesHttpService class
 		/// </summary>
-		private readonly Dictionary <string, string> _resourcePaths ;
+		public class ResourcesHttpServiceData : JObject
+		{
+			/// <summary>
+			/// Auxiliary variable for resourcePaths property
+			/// </summary>
+			protected Dictionary<string, string> _resourcePaths;
+			/// <summary>
+			/// This dictionary contains lowcase file names for keys and full resource names for values.
+			/// <br/>It speeds up search hopefully.
+			/// </summary>
+			public Dictionary<string, string> resourcePaths
+			{
+				get => _resourcePaths ;
+			}
+			/// <summary>
+			/// Auxiliary variable for resourceAssembly property
+			/// </summary>
+			protected Assembly _resourceAssembly ;
+			/// <summary>
+			/// Assembly with resources to load data from
+			/// </summary>
+			public Assembly resourceAssembly
+			{
+				get => _resourceAssembly ;
+			}
+			/// <summary>
+			/// Auxiliary variable for resourceAssembly property
+			/// </summary>
+			protected string _resourceAssemblySource ;
+			/// <summary>
+			/// Name or path of assembly with resources to load data from
+			/// </summary>
+			public string resourceAssemblySource
+			{
+				get => _resourceAssemblySource;
+			}
+			/// <summary>
+			/// Creates new empty instance of the ResourcesHttpServiceData class
+			/// </summary>
+			public ResourcesHttpServiceData()
+			{
+			}
+			/// <summary>
+			/// Load assembly from valid(!) path and creates new ResourcesHttpServiceData instance
+			/// </summary>
+			public ResourcesHttpServiceData ( JObject obj )
+			{
+				loadFromJSON ( obj ) ;
+			}
+			/// <summary>
+			/// Load assembly from valid(!) path and creates new ResourcesHttpServiceData instance
+			/// </summary>
+			/// <param name="path">Assembly location</param>
+			public ResourcesHttpServiceData ( string path ) : this ( WebServerConfigData.loadAssembly ( path ) )
+			{
+				_resourceAssemblySource = path ;
+				Add ( "resourceAssemblySource" , path ) ;
+			}
+			/// <summary>
+			/// Creates new ResourcesHttpServiceData instance with given assembly.
+			/// <br/>It creates resource paths it self
+			/// </summary>
+			/// <param name="assembly">Valid, non null assembly</param>
+			public ResourcesHttpServiceData ( Assembly assembly ) : this ( assembly , null )
+			{
+			}
+			/// <summary>
+			/// 
+			/// </summary>
+			/// <param name="assembly">Assembly with resources</param>
+			/// <param name="paths">Dictionary containing lowcase file names for keys and full resource names for values.</param>
+			public ResourcesHttpServiceData ( Assembly assembly , Dictionary <string,string> paths )
+			{
+				this.Add ( "assemblyPath" , new JValue ( assembly == null ? "" : assembly.Location ) ) ;
+				_resourceAssembly = assembly ;
+				_resourceAssemblySource = assembly.Location ;
+				_resourcePaths = paths == null ? getAssemblyPaths(assembly) : paths ;
+			}
+			/// <summary>
+			/// Enumarate all resources in given assembly and creates dictionary containing lowcase file names for keys and full resource names for values
+			/// </summary>
+			/// <param name="assembly">Assembly with resources</param>
+			/// <returns>Dictionary containing lowcase file names for keys and full resource names for values.</returns>
+			public static Dictionary<string, string> getAssemblyPaths ( Assembly assembly )
+			{
+				Dictionary<string,string> resourcePaths = new Dictionary<string,string>() ;
+				int prefixLength = assembly.GetName().Name.Length + 11 ; //  11 == ( ".resources." ).Length
+				foreach ( string name in assembly.GetManifestResourceNames() )
+					resourcePaths.Add ( name.ToLower().Substring ( 20 ) , name ) ;
+				return resourcePaths ;
+			}
+			/// <summary>
+			/// Loads ResourcesHttpService.ResourcesHttpService object with data from json string
+			/// </summary>
+			/// <param name="json">JSON string</param>
+			public virtual void loadFromJSON ( JObject obj )
+			{
+				JToken token = obj [ "assemblyPath" ] ;
+				if ( token == null )
+					throw new InvalidDataException ( "Key \"assemblyPath\" not found in JSON data") ;
+
+				if ( token.Type == JTokenType.String )
+				{
+					Add ( "assemblyPath" , token.ToObject<string>() ) ;
+					_resourceAssembly = Assembly.LoadFrom ( token.ToObject<string>() ) ;
+					_resourcePaths = getAssemblyPaths ( _resourceAssembly ) ;
+
+				}
+				else throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"assemblyPath\"" ) ;
+			}
+			///// <summary>
+			///// Saves TestHttpService.TestHttpServiceData object to json string
+			///// </summary>
+			///// <param name="json">JSON string</param>
+			//public override void saveToJSON(out string json)
+			//{
+			//	json = "{ \"assemblyPath\":" + (_resourceAssembly == null ? "" : JsonConvert.SerializeObject(_resourceAssembly.Location)) + " }";
+			//}
+		}
 		/// <summary>
-		/// Assembly with resources to load data from
+		/// Auxiliary variable for the resourcesConfigData 
 		/// </summary>
-		private Assembly _resourceAssembly ;
+		protected ResourcesHttpServiceData _resourcesConfigData ;
+		/// <summary>
+		/// Anything
+		/// </summary>
+		public virtual ResourcesHttpServiceData resourcesConfigData
+		{
+			get => _resourcesConfigData ;
+		}
 
 		/// <summary>
-		/// Creates new instance of the ResourcesHttpService instance
+		/// Enumarate all resources in given assembly and creates dictionary containing lowcase file names for keys and full resource names for values
 		/// </summary>
-		/// <param name="resourcePaths">Dictionary with lowcase file names for keys and full resource names for values.</param>
-		/// <param name="resourceAssembly">Assembly with resources to load data from</param>
-		/// <param name="stream">Stream to read data from</param>
-		/// <param name="requestedPath">Requested path</param>
-		/// <param name="webroot">Web root path</param>
-		/// <param name="logger">IWebSocketLogger instance or null</param>
-		/// <param name="charset">Value of "charset" (sub)attribute in "Content-Type" response header attribute</param>
-        public ResourcesHttpService ( Stream stream , Uri requestedPath , Dictionary<string, string> resourcePaths , Assembly resourceAssembly , IWebSocketLogger logger )
-        {
-            _stream = stream ;
-            _requestedPath = requestedPath ;
-            _logger = logger ;
-			_resourcePaths = resourcePaths ;
-			_resourceAssembly = resourceAssembly ;
-        }
-
+		/// <param name="assembly">Assembly with resources</param>
+		/// <returns>Dictionary containing lowcase file names for keys and full resource names for values.</returns>
+		public static Dictionary<string, string> getAssemblyPaths ( Assembly assembly )
+		{
+			Dictionary<string, string> resourcePaths = new Dictionary<string, string> () ;
+			int prefixLength = assembly.GetName().Name.Length + 11 ;	//  11 == ( ".resources." ).Length
+			foreach ( string name in assembly.GetManifestResourceNames () )
+				resourcePaths.Add ( name.ToLower().Substring ( 20 ) , name ) ;
+			return resourcePaths  ;
+		}
+		/// <summary>
+		/// Init new instance 
+		/// </summary>
+		/// <param name="server">WebServer instance</param>
+		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="configData">(ResourcesHttpServiceData)</param>
+		public override void init ( WebServer server, HttpConnectionDetails connection , JObject configData )
+		{
+			//_resourcesConfigData = configData as ResourcesHttpServiceData ;
+			//if ( _resourcesConfigData == null ) _resourcesConfigData = new ResourcesHttpServiceData ( Assembly.GetEntryAssembly().Location ) ;
+			if ( configData == null )
+				_resourcesConfigData = new ResourcesHttpServiceData () ;
+			else 
+			{
+				_resourcesConfigData = configData as ResourcesHttpServiceData ;
+				if ( _resourcesConfigData == null ) _resourcesConfigData = new ResourcesHttpServiceData ( configData ) ;
+			}
+			base.init ( server , connection , _resourcesConfigData ) ;
+		}
 		/// <summary>
 		/// This method sends file from 
         /// </summary>
@@ -53,12 +192,11 @@ namespace WebSockets
 		/// <returns>Should returns true if response is 400 and everything OK</returns>
         public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
         {
-            _logger?.Information (  this.GetType(), "Request: {0}", _requestedPath ) ;
 			responseHeader = "" ;
 			codeError = null ;
 			try
 			{
-				string resourcePath = getSafePath ( "" , _requestedPath.LocalPath ).Replace ( '\\' , '.' ) ; ;
+				string resourcePath = getSafePath ( "" , connection.request.uri.LocalPath ).Replace ( '\\' , '.' ) ; ;
 				if ( ( resourcePath == "" ) || ( resourcePath == "." )  )
 					resourcePath  = "default.html" ; 
 				else if ( resourcePath  [ 0 ] == '.' )
@@ -66,23 +204,23 @@ namespace WebSockets
 					
 				resourcePath = resourcePath.ToLower() ;
 				System.Diagnostics.Debug.WriteLine ( "resourcePath: " + resourcePath ) ;
-				if ( _resourcePaths.ContainsKey ( resourcePath.ToLower() ) )
+				if ( _resourcesConfigData.resourcePaths.ContainsKey ( resourcePath.ToLower() ) )
 				{
 
 					MimeTypeAndCharset contentTypeAndCharset ;
 					string ext = "" ;
 					int i = resourcePath.LastIndexOf ( '.' ) + 1 ;
 					if ( ( i != 0 ) && ( i < resourcePath.Length ) ) ext = resourcePath.Substring ( i ) ;
-					if ( mimeTypesByFolder.getMimeTypes ( this , _requestedPath ).TryGetValue ( ext , out contentTypeAndCharset ) )
+					if ( mimeTypesByFolder.getMimeTypes ( this , connection.request.uri ).TryGetValue ( ext , out contentTypeAndCharset ) )
 					{
 						Stream reourceStream = null ;
 						try
 						{
-							reourceStream = _resourceAssembly.GetManifestResourceStream ( _resourcePaths [ resourcePath ] ) ;
+							reourceStream = _resourcesConfigData.resourceAssembly.GetManifestResourceStream ( _resourcesConfigData.resourcePaths [ resourcePath ] ) ;
 							//System.Diagnostics.Debug.WriteLine (  "resource stream is null:" + ( reourceStream == null ).ToString () ) ;
 							int buffSize = 65536 ;
 							Byte [ ] buffer = new byte [ buffSize ] ;
-							responseHeader = RespondChunkedSuccess ( contentTypeAndCharset ) ;
+							responseHeader = connection.request.method.Trim().ToUpper() == "POST" ? RespondChunkedCreated ( contentTypeAndCharset  ) : RespondChunkedSuccess ( contentTypeAndCharset ) ;
 							int r = reourceStream.Read ( buffer , 0 , buffSize ) ;
 							while ( r == buffSize )
 							{
@@ -98,7 +236,7 @@ namespace WebSockets
 						}
 						catch 
 						{
-							responseHeader = RespondNotFoundFailure ( _requestedPath.LocalPath ) ;
+							responseHeader = RespondNotFoundFailure ( connection.request.uri.LocalPath ) ;
 						}
 						try
 						{
@@ -111,9 +249,9 @@ namespace WebSockets
 						}
 						catch {}
 					}
-					else responseHeader = RespondMimeTypeFailure ( _requestedPath.LocalPath ) ;
+					else responseHeader = RespondMimeTypeFailure ( connection.request.uri.LocalPath ) ;
 				}
-				else responseHeader = RespondNotFoundFailure ( _requestedPath.LocalPath ) ;
+				else responseHeader = RespondNotFoundFailure ( connection.request.uri.LocalPath ) ;
 			}
 			catch ( Exception x )
 			{
@@ -133,7 +271,7 @@ namespace WebSockets
 				resourcePath  = "default.html" ; 
 			else if ( resourcePath [ 0 ] == '.' )
 				resourcePath = resourcePath.Substring ( 1 ) ;
-			return _resourceAssembly.GetManifestResourceStream ( _resourcePaths [ resourcePath.ToLower() ] ) ;
+			return resourcesConfigData.resourceAssembly.GetManifestResourceStream ( resourcesConfigData.resourcePaths [ resourcePath.ToLower() ] ) ;
 		}
 
     }

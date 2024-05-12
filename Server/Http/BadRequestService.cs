@@ -10,14 +10,6 @@ namespace WebSockets
 {
     public class BadRequestService : HttpServiceBase
     {
-        private readonly string _header ;
-
-        public BadRequestService ( Stream stream , string header , IWebSocketLogger logger )
-        {
-            _stream = stream;
-            _header = header;
-            _logger = logger;
-        }
 
         public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
         {
@@ -25,11 +17,7 @@ namespace WebSockets
 			codeError = null ;
 			try
 			{
-				HttpServiceBase.WriteHttpHeader ( responseHeader , _stream ) ;
-
-				// limit what we log. Headers can be up to 16K in size
-				string header = _header.Length > 255 ? _header.Substring(0,255) + "..." : _header;
-				_logger.Warning(this.GetType(), "Bad request: '{0}'", header) ;
+				HttpServiceBase.WriteHttpHeader ( responseHeader , connection.stream ) ;
 			}
 			catch ( Exception x )
 			{
