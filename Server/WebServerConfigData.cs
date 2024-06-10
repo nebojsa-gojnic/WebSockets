@@ -1,22 +1,43 @@
 ﻿using System ;
 using System.Collections ;
 using System.Collections.Generic ;
-using Newtonsoft.Json.Linq ;
 using Newtonsoft.Json ;
+using Newtonsoft.Json.Schema ;
+using Newtonsoft.Json.Linq ;
 using System.IO ;
 using System.Collections.ObjectModel ;
 using System.Security.Authentication ;
 using System.Reflection ;
 using System.Security.Cryptography.X509Certificates ;
-using System.Linq;
+using System.Text ;
 
 namespace WebSockets
 {
+
 	/// <summary>
 	/// JSON configuration for WebServer class
 	/// </summary>
 	public class WebServerConfigData:JObject
 	{
+		protected static JsonSerializer _jsonSerializer ;
+		static WebServerConfigData()
+		{
+			JsonSerializerSettings settings = new JsonSerializerSettings () ;
+			settings.Formatting = Formatting.Indented ;
+			_jsonSerializer = JsonSerializer.Create ( settings ) ;
+		}
+		public static void json2string ( JObject jObject , StringBuilder stringBuilder  )
+		{
+			stringBuilder.Clear () ;
+			StringWriter sw = new StringWriter ( stringBuilder ) ;
+			JsonTextWriter jsonTextWriter = new JsonTextWriter ( sw ) ;
+			jsonTextWriter.Formatting = Formatting.Indented ;
+			jsonTextWriter.Indentation = 1 ;
+			jsonTextWriter.IndentChar = '\t' ;
+			_jsonSerializer.Serialize ( jsonTextWriter , jObject ) ;
+			jsonTextWriter.Close () ;
+			sw.Dispose () ;
+		}
 		/// <summary>
 		/// Creates new empty instance of the WebServerConfigData class
 		/// </summary>
@@ -28,10 +49,13 @@ namespace WebSockets
 			_sslCertificateSubject = null ;
 			_sslCertificate = null ;
 			_sslCertificateSource = "" ;
+			_errorList = new List<Exception> () ;
+			_readOnlyErrorList = _errorList.AsReadOnly() ;
 			_services = new Dictionary<string, HttpServiceActivator> () ;
 			_readOnlyServices = new ReadOnlyDictionary <string, HttpServiceActivator> ( _services ) ;
 			_paths = new Dictionary<PathDefinition, HttpServiceActivator> () ;
 			_readOnlyPaths = new ReadOnlyDictionary <PathDefinition, HttpServiceActivator> ( _paths ) ;
+			_serviceDemandCount = 0 ;
 		}
 		/// <summary>
 		/// Creates WebServerConfigData instance from given WebServer instance
@@ -52,7 +76,7 @@ namespace WebSockets
 			JArray paths = new JArray () ;
 			Add ( "port" , _port = port ) ;
 			if ( !string.IsNullOrWhiteSpace ( _sitename = siteName ) ) Add ( "sitename" , _sitename ) ;
-			if ( !string.IsNullOrWhiteSpace ( _sslCertificateSource = certificatePath  ) )
+			if ( !string.IsNullOrWhiteSpace ( _sslCertificateSource = certificatePath ) )
 			{
 				Add ( "sslCertificate" , _sslCertificateSource ) ;
 				Add ( "sslCertificatePassword" , _sslCertificatePassword = string.IsNullOrWhiteSpace ( certificatePassword ) ? "" : certificatePassword ) ;
@@ -79,7 +103,19 @@ namespace WebSockets
 				_paths.Add ( pair ) ;
 			}
 		}
-		
+		/// <summary>
+		/// Auxiliary variable for the serviceDemandCount  property, number of services specified in json config file
+		/// </summary>
+		protected int _serviceDemandCount ;
+		/// <summary>
+		/// Number of services specified in json config file.<br/>
+		/// Invalid configirations are ignored, so this number can be bigger then actual number of services.
+		/// </summary>
+		public int serviceDemandCount  
+		{
+			get => _serviceDemandCount ;
+		}
+
 		/// <summary>
 		/// Auxiliary variable for the services property, real source dictionary is here
 		/// </summary>
@@ -224,14 +260,15 @@ namespace WebSockets
 		/// <returns>Returns X509Certificate2 instance or null. It may raise exception while loading certificate.</returns>
 		public X509Certificate2 getSslCertificate ()
 		{
-			if ( string.IsNullOrWhiteSpace ( sslCertificateSource ) )
-				return null ;
-			else if ( _sslCertificate == null ) 
-			{
-				_sslCertificate = new X509Certificate2 ( sslCertificateSource , sslCertificatePassword ) ;
-				_sslCertificateIssuer = getCNValue ( _sslCertificate.Issuer ) ;
-				_sslCertificateSubject = getCNValue ( _sslCertificate.Subject ) ;
-			}
+			if ( _sslCertificate == null ) 
+				if ( string.IsNullOrWhiteSpace ( sslCertificateSource ) )
+					return null ;
+				else
+				{
+					_sslCertificate = new X509Certificate2 ( sslCertificateSource , sslCertificatePassword ) ;
+					_sslCertificateIssuer = getCNValue ( _sslCertificate.Issuer ) ;
+					_sslCertificateSubject = getCNValue ( _sslCertificate.Subject ) ;
+				}
 			return _sslCertificate ;
 		}
 		public static string getCNValue ( string fieldValue )
@@ -299,10 +336,11 @@ namespace WebSockets
 		/// <param name="errorList">List of errors(exceptions)</param>
 		/// <returns>Returns name/service dictionary.</returns>
 		/// <exception cref="InvalidDataException"></exception>
-		public static IDictionary<string,HttpServiceActivator> loadServices ( JArray array , ref IList<Exception> errorList )
+		public static IDictionary<string,HttpServiceActivator> loadServices ( JArray array , out int serviceDemandCount , ref IList<Exception> errorList )
 		{
 			if ( errorList == null ) errorList = new List<Exception> () ;
 			IDictionary<string,HttpServiceActivator> ret = new Dictionary<string,HttpServiceActivator> () ;
+			serviceDemandCount  = 0 ;
 			if ( array != null )
 				foreach ( JToken token in array )
 					if ( token.Type == JTokenType.Object )
@@ -311,6 +349,7 @@ namespace WebSockets
 						if ( obj != null )
 							try
 							{
+								serviceDemandCount ++ ;
 								KeyValuePair<string,HttpServiceActivator> pair = loadServiceActivator ( obj ) ;
 								if ( ret.ContainsKey ( pair.Key ) ) throw new InvalidDataException ( "Double service activator name \"" + pair.Key + "\"" ) ; 
 								ret.Add ( pair.Key , pair.Value ) ;
@@ -325,7 +364,7 @@ namespace WebSockets
 		/// <summary>
 		/// Load a KeyValuePair&lt;string,HttpServiceActivator&gt; from json object(JObject)
 		/// </summary>
-		/// <param name="obj">JSON Object (JObject)<br/>
+		/// <param name="obj">JSON Object (WebServerConfigData)<br/>
 		/// {<br/>
 		/// "service":"service name" ,<br/>
 		/// "source": "assembly qualified type name or just type name"<br/>
@@ -432,7 +471,6 @@ namespace WebSockets
 			if ( errorList == null ) errorList = new List<Exception> () ;
 			IDictionary<PathDefinition,string> ret = new Dictionary<PathDefinition,string> () ;
 			if ( array != null ) 
-			{
 				foreach ( JToken token in array )
 					try
 					{
@@ -455,7 +493,6 @@ namespace WebSockets
 					{
 						errorList.Add ( x ) ;
 					}
-			}
 			return ret ;
 		}
 		/// <summary>
@@ -473,12 +510,6 @@ namespace WebSockets
 			string service = token.ToString () ;
 			token = obj.GetValue ( "path" ) ;
 			if ( token == null ) throw new InvalidDataException ( "JSON error, field \"path\" not found in path definition section." ) ;
-			
-			bool noSubPaths = false ;
-			if ( token != null ) 
-				if ( token.Type == JTokenType.Boolean )
-					noSubPaths = ( bool ) token.Value<bool>() ;
-					
 			string path = token.ToString () ;
 			token = obj.GetValue ( "severity" ) ;
 			int severity = 0 ;
@@ -495,6 +526,23 @@ namespace WebSockets
 					break ;
 				}
 			}
+			bool noSubPaths = false ;
+			token = obj.GetValue ( "noSubPaths" ) ;
+			if ( token != null ) 
+				switch ( token.Type )
+				{
+					case JTokenType.String :
+						bool.TryParse ( token.ToString () , out noSubPaths ) ;
+					break ;
+					case JTokenType.Boolean :
+						noSubPaths = token.Value<Boolean>() ;
+					break ;
+					case JTokenType.Integer :
+					case JTokenType.Float :
+						noSubPaths = token.Value<int>() != 0 ;
+					break ;
+				}
+					
 			return new KeyValuePair<PathDefinition,string> ( new PathDefinition ( path , noSubPaths , severity ) , service ) ;
 		}
 		/// <summary>
@@ -526,28 +574,54 @@ namespace WebSockets
 		/// <exception cref="InvalidDataException"></exception>
 		public virtual void loadFromJSON ( JObject obj )
 		{
-			//JObject obj = JsonConvert.DeserializeObject ( json ) as JObject ;
-			if ( obj == null ) throw new InvalidDataException ( "Invalid JSON type, object expected" ) ;
-			
-			if ( obj != this )
-			{
-				this.RemoveAll () ;
-				foreach ( KeyValuePair<string,JToken> pair in obj )
-					this.Add ( pair.Key , pair.Value ) ;
-			}
-			createProperties () ;
+			loadFromJSON ( obj , null ) ;
 		}
 		/// <summary>
-		/// This methos reads JSON tokens(KeyValuePair&lt;string,JToken&gt;) from its self in order to assign values to properties.<br/>
+		/// Load this object with data from JSON object(JObject)
+		/// </summary>
+		/// <param name="obj">JSON object(JObject)<br/>
+		/// {<br/>
+		/// "port":443, "sitename":"myDomain" , "sslCertificate":"path_to_file" , "sslProtocol":"tls1.2",<br/>
+		/// "services":[{},{}...{}]<br/>
+		/// "paths":[{},{}...{}]<br/>
+		/// }</param>
+		/// <param name="certificate ">When this is null new instance of X509Certificate2 will be creared for the certificate property,<br/>
+		/// otherwise new value for the sslCertificate property will be created when it is called for the first time in coresponding get method.</param>
+		/// <exception cref="InvalidDataException"></exception>
+		public virtual void loadFromJSON ( JObject jObject , X509Certificate2 certificate )
+		{
+			//JObject obj = JsonConvert.DeserializeObject ( json ) as JObject ;
+			if ( jObject == null ) throw new InvalidDataException ( "Invalid JSON type, object expected" ) ;
+			if ( jObject.First == null ) throw new InvalidDataException ( "Empty JSON" ) ;
+			if ( jObject != this )
+			{
+				
+				this.RemoveAll () ;
+				foreach ( KeyValuePair<string,JToken> pair in jObject )
+					this.Add ( pair.Key , pair.Value ) ;
+			}
+			createProperties ( certificate ) ;
+		}
+		/// <summary>
+		/// This method reads JSON tokens(KeyValuePair&lt;string,JToken&gt;) from its self in order to assign values to properties.
 		/// </summary>
 		/// <exception cref="InvalidDataException"></exception>
 		protected virtual void createProperties ( )
 		{
-			IList<Exception> ls = ( List<Exception> ) _errorList ;
+			createProperties ( null ) ;
+		}
+		/// <summary>
+		/// This method reads JSON tokens(KeyValuePair&lt;string,JToken&gt;) from its self in order to assign values to properties.
+		/// </summary>
+		/// <param name="certificate ">When this is null new instance of X509Certificate2 will be creared for the certificate property,<br/>
+		/// otherwise new value for the sslCertificate property will be created when it is called for the first time in coresponding get method.</param>
+		/// <exception cref="InvalidDataException"></exception>
+		protected virtual void createProperties ( X509Certificate2 certificate )
+		{
+			_sslCertificate = certificate  ;
 			JToken token = GetValue ( "port" ) ;
 			_sslCertificateIssuer = null ;
 			_sslCertificateSubject = null ;
-			_sslCertificate = null ;
 
 			if ( token == null ) throw new InvalidDataException ( "JSON error, field \"port\" not found" ) ;
 			switch ( token.Type )
@@ -627,12 +701,12 @@ namespace WebSockets
 			JToken pathsToken = GetValue ( "paths" ) ;
 			if ( servicesToken == null ) throw new InvalidDataException ( "JSON error, field \"services\" not found" ) ;
 			if ( servicesToken.Type != JTokenType.Array ) throw new InvalidDataException ( "JSON error, invalid type for the field \"services\", expected array" ) ;
-			_errorList = new List<Exception> () ;
+			IList<Exception> ls = ( List<Exception> ) _errorList ;
 			
 			if ( pathsToken == null ) throw new InvalidDataException ( "JSON error, field \"paths\" not found" ) ;
 			if ( pathsToken.Type != JTokenType.Array ) throw new InvalidDataException ( "JSON error, invalid type for the field \"paths\", expected array" ) ;
 
-			_services = loadServices ( ( JArray ) servicesToken , ref ls ) ;
+			_services = loadServices ( ( JArray ) servicesToken , out _serviceDemandCount , ref ls ) ;
 			_pathDemands = loadPathDemands ( ( JArray ) pathsToken , ref ls ) ;
 
 			_paths = joinPathsAndServices ( _services , _pathDemands , ref ls ) ;
@@ -640,12 +714,14 @@ namespace WebSockets
 			_readOnlyServices = new ReadOnlyDictionary<string,HttpServiceActivator> ( _services ) ;
 			_readOnlyPathDemands = new ReadOnlyDictionary<PathDefinition,string> ( _pathDemands ) ;
 			_readOnlyPaths = new ReadOnlyDictionary<PathDefinition,HttpServiceActivator> ( _paths ) ;
-			_readOnlyErrorList = _errorList.AsReadOnly() ;
+			
 		}
-		public virtual void saveToJSON ( out string json )
+		public virtual string GetJSONString ( )
 		{
-			json = JsonConvert.SerializeObject ( this ) ;
-		}
+			StringBuilder stringBuilder = new StringBuilder () ;
+			json2string ( this , stringBuilder ) ;
+			return stringBuilder.ToString () ;
+		} 
 		/// <summary>
 		/// Return site uri based on given sitename.<br/>
 		/// If sitename property value is null or empty then sslSubject property value is used for host name part of the uri.
@@ -702,16 +778,13 @@ namespace WebSockets
 			}
 			try
 			{
-				if ( reader != null ) reader.Dispose () ;
+				reader?.Dispose () ;
 			}
 			catch { }
 			
 			if ( error != null ) throw error ;
 			loadFromJSON ( obj ) ;
 		}
-		//public override string ToString()
-		//{
-		//	return JsonConvert.SerializeObject ( this ) ;
-		//}
+		
 	}
 }

@@ -48,6 +48,7 @@ namespace WebSockets
 			public TestHttpServiceData ( string message )
 			{
 				_message = message ;
+				Add ( "message" , message ) ;
 			}
 			/// <summary>
 			/// Creates new instance of FileHttpServiceData class 
@@ -164,6 +165,6 @@ namespace WebSockets
 			MemoryStream ms = new MemoryStream ( getHtmlBytes() ) ;
 			ms.Position = 0 ;
 			return ms ;
-		}		/// <summary>
+		}		
 	}
 }

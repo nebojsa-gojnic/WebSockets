@@ -41,47 +41,47 @@ namespace WebSockets
 		{
 			int i = requestedPath.LastIndexOf ( '/' ) ;
 			if ( i != -1 ) requestedPath = requestedPath.Substring ( 0 , i + 1 ) ;
-			Stream stream = null ;
+			Stream resourceStream = null ;
 			fromDefaults = true ;
 			try
 			{
-				stream = httpService.GetResourceStream ( new Uri ( "/" + requestedPath + "mimeTipe.xml" ) ) ;
-				if ( loadFromXml ( stream ) )
+				resourceStream = httpService.GetResourceStream ( new Uri ( "/" + requestedPath + "mimeTipe.xml" ) ) ;
+				if ( loadFromXml ( resourceStream ) )
 				{
-					stream.Close () ;
-					stream.Dispose () ;
+					resourceStream.Close () ;
+					resourceStream.Dispose () ;
 					return ;
 				}
 
 			}
 			catch 
 			{ 
-				if ( stream != null )
+				if ( resourceStream != null )
 				{
 					try
 					{
-						stream.Close () ;
-						stream.Dispose () ;
+						resourceStream.Close () ;
+						resourceStream.Dispose () ;
 					}
 					catch { }
-					stream = null ;
+					resourceStream = null ;
 				}
 			}
 			try
 			{
-				stream = httpService.GetResourceStream ( new Uri ( "/" + requestedPath + "mimeTipe.json" ) ) ;
-				fromDefaults = loadFromJson ( stream ) ;
+				resourceStream = httpService.GetResourceStream ( new Uri ( "/" + requestedPath + "mimeTipe.json" ) ) ;
+				fromDefaults = loadFromJson ( resourceStream ) ;
 			}
 			catch { }
-			if ( stream != null )
+			if ( resourceStream != null )
 			{
 				try
 				{
-					stream.Close () ;
-					stream.Dispose () ;
+					resourceStream.Close () ;
+					resourceStream.Dispose () ;
 				}
 				catch { }
-				stream = null ;
+				resourceStream = null ;
 			}
 			if ( fromDefaults )
 				foreach ( KeyValuePair<string,string> keyValuePair in defaultMimeTypeValues )
@@ -358,7 +358,6 @@ namespace WebSockets
 			stringBuilder [ stringBuilder.Length - 2 ] = ' ' ;
 			stringBuilder.Append ( "\r\n]" ) ;
 			return stringBuilder.ToString() ;
-				//JsonConvert.SerializeObject ( this.Values , Newtonsoft.Json.Formatting.Indented ) ;
 		}
 		#region static
 		/// <summary>

@@ -54,7 +54,7 @@ namespace WebSockets
 			/// </summary>
 			public string resourceAssemblySource
 			{
-				get => _resourceAssemblySource;
+				get => _resourceAssemblySource ;
 			}
 			/// <summary>
 			/// Creates new empty instance of the ResourcesHttpServiceData class
@@ -75,8 +75,8 @@ namespace WebSockets
 			/// <param name="path">Assembly location</param>
 			public ResourcesHttpServiceData ( string path ) : this ( WebServerConfigData.loadAssembly ( path ) )
 			{
-				_resourceAssemblySource = path ;
-				Add ( "resourceAssemblySource" , path ) ;
+				if ( _resourceAssembly == null ) 
+					this [ "resourceAssemblySource" ] = _resourceAssemblySource = path ; //!!!!yessss
 			}
 			/// <summary>
 			/// Creates new ResourcesHttpServiceData instance with given assembly.
@@ -93,10 +93,10 @@ namespace WebSockets
 			/// <param name="paths">Dictionary containing lowcase file names for keys and full resource names for values.</param>
 			public ResourcesHttpServiceData ( Assembly assembly , Dictionary <string,string> paths )
 			{
-				this.Add ( "assemblyPath" , new JValue ( assembly == null ? "" : assembly.Location ) ) ;
 				_resourceAssembly = assembly ;
-				_resourceAssemblySource = assembly.Location ;
-				_resourcePaths = paths == null ? getAssemblyPaths(assembly) : paths ;
+				_resourceAssemblySource = assembly == null ? "" : assembly.Location ;
+				this.Add ( "resourceAssemblySource" , new JValue ( assembly == null ? "" : assembly.Location ) ) ;
+				_resourcePaths = paths == null ?  assembly == null ? null : getAssemblyPaths ( assembly ) : paths ;
 			}
 			/// <summary>
 			/// Enumarate all resources in given assembly and creates dictionary containing lowcase file names for keys and full resource names for values
@@ -108,7 +108,11 @@ namespace WebSockets
 				Dictionary<string,string> resourcePaths = new Dictionary<string,string>() ;
 				int prefixLength = assembly.GetName().Name.Length + 11 ; //  11 == ( ".resources." ).Length
 				foreach ( string name in assembly.GetManifestResourceNames() )
-					resourcePaths.Add ( name.ToLower().Substring ( 20 ) , name ) ;
+					try			//it maybe doubles
+					{
+						resourcePaths.Add ( name.ToLower().Substring ( prefixLength ) , name ) ;
+					}
+					catch { }
 				return resourcePaths ;
 			}
 			/// <summary>
@@ -117,18 +121,17 @@ namespace WebSockets
 			/// <param name="json">JSON string</param>
 			public virtual void loadFromJSON ( JObject obj )
 			{
-				JToken token = obj [ "assemblyPath" ] ;
+				JToken token = obj [ "resourceAssemblySource" ] ;
 				if ( token == null )
-					throw new InvalidDataException ( "Key \"assemblyPath\" not found in JSON data") ;
+					throw new InvalidDataException ( "Key \"resourceAssemblySource\" not found in JSON data") ;
 
 				if ( token.Type == JTokenType.String )
 				{
-					Add ( "assemblyPath" , token.ToObject<string>() ) ;
 					_resourceAssembly = Assembly.LoadFrom ( token.ToObject<string>() ) ;
+					this [ "resourceAssemblySource" ] = _resourceAssembly.Location ;
 					_resourcePaths = getAssemblyPaths ( _resourceAssembly ) ;
-
 				}
-				else throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"assemblyPath\"" ) ;
+				else throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"resourceAssemblySource\"" ) ;
 			}
 			///// <summary>
 			///// Saves TestHttpService.TestHttpServiceData object to json string
@@ -161,8 +164,12 @@ namespace WebSockets
 			Dictionary<string, string> resourcePaths = new Dictionary<string, string> () ;
 			int prefixLength = assembly.GetName().Name.Length + 11 ;	//  11 == ( ".resources." ).Length
 			foreach ( string name in assembly.GetManifestResourceNames () )
-				resourcePaths.Add ( name.ToLower().Substring ( 20 ) , name ) ;
-			return resourcePaths  ;
+			try				//it maybe doubles ?
+			{
+				resourcePaths.Add ( name.ToLower().Substring ( prefixLength ) , name ) ;
+			}
+			catch { }
+			return resourcePaths ;
 		}
 		/// <summary>
 		/// Init new instance 

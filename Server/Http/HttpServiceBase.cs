@@ -172,6 +172,19 @@ namespace WebSockets
 			connection.stream.WriteByte ( ( byte ) '\n' ) ;
 		}
 		/// <summary>
+		/// Write single chunk into response stream
+		/// </summary>
+		/// <param name="buffer">Bytes to write</param>
+		/// <param name="length"></param>
+		public void WriteChunk ( byte [] buffer , int position , int length )
+		{
+			byte [] header = Encoding.ASCII.GetBytes ( length.ToString ( "x" ) + "\r\n" ) ;
+			connection.stream.Write ( header , 0 , header.Length ) ;
+			connection.stream.Write ( buffer , position , length ) ;
+			connection.stream.WriteByte ( ( byte ) '\r' ) ;
+			connection.stream.WriteByte ( ( byte ) '\n' ) ;
+		}
+		/// <summary>
 		/// Write final(empty) chunk into response stream
 		/// </summary>
 		public void WriteFinalChunk (  )

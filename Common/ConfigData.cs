@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq ;
 using Newtonsoft.Json ;
 namespace WebSockets
 {
-	public abstract class ConfigData1
+	public abstract class ConfigData
 	{
 		// <summary>
 		/// Loads real object with data from json string

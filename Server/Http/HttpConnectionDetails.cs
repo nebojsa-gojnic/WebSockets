@@ -57,7 +57,7 @@ namespace WebSockets
 		{
             this.stream = null ;
             this.tcpClient = null ;
-			this.request = new HttpRequestData ( uri ) ;
+			if ( uri != null ) this.request = new HttpRequestData ( uri ) ;
 			this.created = DateTime.Now ;
 			this.origin = null ;
 			this.responseHeader = "" ;
@@ -65,34 +65,34 @@ namespace WebSockets
 		} 
 		public HttpConnectionDetails ( TcpClient tcpClient , X509Certificate2 sslCertificate , SslProtocols sslProtocol ) 
         {
-			this.sslCertificate = sslCertificate ;
-			this.sslProtocol = sslProtocol ;
-			//this.mimeTypes = mimeTypes ;
 			try
 			{
-				this.origin = tcpClient.Client == null ? null : ( ( IPEndPoint ) tcpClient.Client.RemoteEndPoint ).Address ;
-				this.stream = GetStream ( tcpClient , sslCertificate , sslProtocol ) ;
+				this.sslCertificate = sslCertificate ;
+				this.sslProtocol = sslProtocol ;
+				//this.mimeTypes = mimeTypes ;
+				try
+				{
+					this.origin = tcpClient.Client == null ? null : ( ( IPEndPoint ) tcpClient.Client.RemoteEndPoint ).Address ;
+					this.stream = GetStream ( tcpClient , sslCertificate , sslProtocol ) ;
+				}
+				catch ( Exception x ) 
+				{ 
+					this.stream = null ;
+					this.error = x ;
+				}
+				this.request = new HttpRequestData ( this ) ;
+				this.tcpClient = tcpClient ;
+			
+				if ( this.error == null )
+					if ( this.request.uri == null )
+						this.error = string.IsNullOrEmpty ( request.path ) ?
+								new FormatException ( "Cannot read header" ) :
+								new FormatException ( "Invalid uri: \"" + request.path + "\"" ) ;
 			}
-			catch ( Exception x ) 
-			{ 
-				this.stream = null ;
+			catch ( Exception x ) //we dont want to crash server due a protocol error
+			{
 				this.error = x ;
 			}
-			this.request = new HttpRequestData ( this ) ;
-            this.tcpClient = tcpClient ;
-			
-			if ( this.error == null )
-				if ( this.request.uri == null )
-					try
-					{
-						throw ( string.IsNullOrEmpty ( request.path ) ?
-							new FormatException ( "Cannot read header" ) :
-							new FormatException ( "Invalid uri: \"" + request.path + "\"" ) ) ;
-					}
-					catch ( Exception x )
-					{
-						this.error = x ;
-					}
 
 			this.created = DateTime.Now ;
 			this.responseHeader = "" ;

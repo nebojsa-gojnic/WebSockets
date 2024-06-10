@@ -3,6 +3,8 @@ using System.IO ;
 using System.Text ;
 using WebSockets ;
 using System.Text.RegularExpressions ;
+using System.Net.NetworkInformation;
+using System.Net;
 namespace WebSockets
 {
 	/// <summary>
@@ -37,12 +39,24 @@ namespace WebSockets
 		/// <summary>
 		/// Entire header string
 		/// </summary>
+		public readonly string firstLine  ;
+		/// <summary>
+		/// Entire header string
+		/// </summary>
 		public readonly string header ;
+		/// <summary>
+		/// Auxiliary variable for the error property value
+		/// </summary>
+		protected Exception _error ;
+		/// <summary>
+		/// Error, if any
+		/// </summary>
+		public Exception error ;
 		/// <summary>
 		/// Creates new instance of HttpRequestData
 		/// </summary>
 		/// <param name="connection">HttpConnectionDetails instance with header string</param>
-		public HttpRequestData ( HttpConnectionDetails connection ):this ( connection.sslCertificate != null , ReadHttpHeader ( connection.stream ) )
+		public HttpRequestData ( HttpConnectionDetails connection ):this ( connection.sslCertificate != null , new HttpHeaderData ( connection.stream ) )
 		{
 
 		}
@@ -53,7 +67,7 @@ namespace WebSockets
 		public HttpRequestData ( Uri uri )
 		{
 			this.uri = uri ;
-			method = "" ;
+			method = "GET" ;
 			header = "" ;
 			secure = uri.GetLeftPart ( UriPartial.Scheme ) == "https" ;
 		}
@@ -66,81 +80,39 @@ namespace WebSockets
 		/// </summary>
 		/// <param name="secure">This way we inform HttpRequestData instance should it make "http" or "https" uri.</param>
 		/// <param name="header">Header to read data from</param>
-		public HttpRequestData ( bool secure , string header )
+		public HttpRequestData ( bool secure , HttpHeaderData headerData )
 		{
-			this.header = header ;
+			this.header = headerData.header ;
+			this.firstLine = headerData.firstLine ;
 			path = "" ;
 			this.secure = secure ;
-			int i0 = header.IndexOf ( ' ' ) ;
-			if ( i0 >= 0 ) method = header.Substring ( 0 , i0 ) ;
-			int i1 = header.IndexOf ( "HTTP" , StringComparison.OrdinalIgnoreCase ) ;
-			int endOfLine = header.IndexOf ( "\r\n" ) ;
-			if ( ( i0 > 0 ) && ( i1 > i0 ) && ( endOfLine > i1 ) )
+			int i0 = firstLine.IndexOf ( ' ' ) ;
+			if ( i0 >= 0 ) method = firstLine.Substring ( 0 , i0 ) ;
+			int i1 = firstLine.IndexOf ( "HTTP" , StringComparison.OrdinalIgnoreCase ) ;
+			if ( ( i0 > 0 ) && ( i1 > i0 ) )
 			{
-				path = header.Substring ( i0 + 1 , i1 - i0 - 2 ) ;
-				i0 = i1 ;
-				i1 = header.IndexOf ( "\r\n" ) ;
-				if ( i1 > i0 )
+				path = firstLine.Substring ( i0 + 1 , i1 - i0 - 2 ) ;
+				protocol = firstLine.Substring ( i1 ) ;
+					
+				i0 = header.IndexOf ( "Host:" , StringComparison.OrdinalIgnoreCase ) ;
+				if ( i0 > -1 )
 				{
-					protocol = header.Substring ( i0 , i1 - i0 ) ;
-					i0 = header.IndexOf ( "Host:" , i1 + 2 , StringComparison.OrdinalIgnoreCase ) ;
-					if ( i0 > 0 )
+					i1 = header.IndexOf ( "\r\n" , i0 + 1 ) ;
+					
+					try
 					{
-						i1 = header.IndexOf ( "\r\n" , i0 + 1 ) ;
-						path = "http" + ( secure ? "s" : "" ) + "://" + header.Substring ( i0 + 5  , i1 - i0 - 5 ).Trim() + path ;
-						Uri.TryCreate ( path , UriKind.RelativeOrAbsolute , out uri ) ;
+						uri = new Uri ( "http" + ( secure ? "s" : "" ) + "://" + header.Substring ( i0 + 5  , i1 - i0 - 5 ).Trim() + path , UriKind.RelativeOrAbsolute ) ;
 					}
-					// check if this is a web socket upgrade request
-					connectionType = new Regex ( "Upgrade: websocket" , RegexOptions.IgnoreCase ).Match ( header ).Success ? 
-															HttpConnectionType.WebSocket : HttpConnectionType.Http ;
+					catch ( Exception x )
+					{ 
+						_error = new HttpListenerException ( 500 , string.Concat ( "Cannot parse requested uri\r\n" , x.Message ) ) ;
+					}
 				}
-				else connectionType = HttpConnectionType.Unknown ;
+				// check if this is a web socket upgrade request
+				connectionType = new Regex ( "Upgrade: websocket" , RegexOptions.IgnoreCase ).Match ( header ).Success ? HttpConnectionType.WebSocket : HttpConnectionType.Http ;
             }
             else connectionType = HttpConnectionType.Unknown ;
 		}
-		/// <summary>
-		/// Returns header string form begining of the given stream.
-		/// <br/>It returns empty string for the null stream.
-		/// </summary>
-		/// <param name="stream">Readable stream(after decryption)</param>
-		/// <returns></returns>
-		/// <exception cref="EntityTooLargeException"></exception>
-		public static string ReadHttpHeader ( Stream stream )
-        {
-			if ( stream == null ) return "" ;
-			StringBuilder stringBuilder = new StringBuilder () ;
-			int last = 0 ;
-			int len = 0 ;
-			while ( len < 3 )
-            {
-                int current = stream.ReadByte () ;
-				if ( current == -1 ) break ; 
-				stringBuilder.Append ( ( char ) current ) ;
-				switch ( current )
-				{
-					case ( int ) '\n' :
-						if ( last == ( int ) '\r' ) 
-							len++ ;
-						else len = 0 ;
-						last = current ;
-					break ;
-					case ( int ) '\r' :
-						if ( last == ( int ) '\n' )
-							len++ ;
-						else len = 0 ;
-						last = current ;
-					break ;
-					default :
-						len = 0 ;
-						last = 0 ;
-					break ;
-				}
-
-                // as per http specification, all headers should end this this
-				//if ( header.Contains ( "\r\n\r\n" ) ) return header;
-
-            } 
-            return stringBuilder.ToString() ;
-        }
+		
     }
 }

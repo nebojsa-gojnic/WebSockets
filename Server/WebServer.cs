@@ -17,6 +17,7 @@ using System.Runtime.Serialization ;
 using System.Collections.ObjectModel ;
 using Newtonsoft.Json.Linq ;
 using Newtonsoft.Json ;
+using System.Linq;
 namespace WebSockets
 {
     public class WebServer : IDisposable
@@ -99,7 +100,7 @@ namespace WebSockets
 		protected EventHandler _started ;
 		protected EventHandler _stoped ;
 		protected EventHandler<HttpConnectionDetails> _connectionErrorRaised ;
-		protected EventHandler<HttpConnectionDetails> _criticalErrorRaised ;
+		protected EventHandler<HttpConnectionDetails> _serviceErrorRaised ;
 		public bool isListening 
 		{
 			get ;
@@ -119,7 +120,7 @@ namespace WebSockets
 						EventHandler<HttpConnectionDetails> serverRespondedEventHandler ,
 						EventHandler startedEventHandle , EventHandler stopedEventHandle , 
 						EventHandler<HttpConnectionDetails> connectionErrorEventHandler , 
-						EventHandler<HttpConnectionDetails> criticalErrorEventHandler ,
+						EventHandler<HttpConnectionDetails> serviceErrorEventHandler ,
 						EventHandler disposedEventHandler )
         {
 			pathManager = new PathManager () ;
@@ -131,7 +132,7 @@ namespace WebSockets
 			_stoped = stopedEventHandle ;	
 			_disposed = disposedEventHandler ;
 			_connectionErrorRaised = connectionErrorEventHandler ;
-			_criticalErrorRaised = criticalErrorEventHandler ;
+			_serviceErrorRaised = serviceErrorEventHandler  ;
 			isListening = false ;
 			mimeTypesByFolder = new MimeTypeDictionary () ;
         }
@@ -159,19 +160,35 @@ namespace WebSockets
 		}
 		public void Listen ( WebServerConfigData configData )
 		{
-			if ( isListening ) throw new ApplicationException ( "Server already started" ) ;
-			_configData = configData ;
-			pathManager.Clear () ;
-			foreach ( KeyValuePair<PathDefinition,HttpServiceActivator> pair in configData.paths )
-				pathManager.Add ( pair.Key , pair.Value ) ;
-            this.sslCertificate = configData.sslCertificate ;
-			this.sslProtocol = configData.sslProtocol ;
-			_port = configData.port ;
-            _listener = new TcpListener ( IPAddress.Any , configData.port ) ;
-            _listener.Start() ;
-			isListening = true ;
-			_started?.Invoke ( this , new EventArgs () ) ;
-            StartAccept() ;
+			Exception error = null ;
+			try
+			{
+				if ( isListening ) throw new ApplicationException ( "Server already started" ) ;
+				if ( configData == null ) throw new ApplicationException ( "No configuration for web server listener" ) ;
+				if ( configData.services.Count == 0 ) throw new ApplicationException ( "No services in configuration file" ) ;
+				_configData = configData ;
+				pathManager.Clear () ;
+				if ( configData.pathDemands.Count == 0 ) throw new ApplicationException ( "No paths in configuration file" ) ;
+
+				foreach ( KeyValuePair<PathDefinition,HttpServiceActivator> pair in configData.paths )
+					pathManager.Add ( pair.Key , pair.Value ) ;
+				if ( pathManager.Count == 0 ) throw new ApplicationException ( "No path matchs active service(s)" ) ;
+				this.sslCertificate = configData.sslCertificate ;
+				this.sslProtocol = configData.sslProtocol ;
+				_port = configData.port ;
+				_listener = new TcpListener ( IPAddress.Any , configData.port ) ;
+				_listener.Start() ;
+				isListening = true ;
+				_started?.Invoke ( this , new EventArgs () ) ;
+				StartAccept() ;
+			}
+			catch ( Exception x )
+			{
+				error = x ;
+				_serviceErrorRaised?.Invoke ( this , new HttpConnectionDetails ( x ) ) ;
+				_stoped?.Invoke ( this , new EventArgs () ) ;
+			}
+			if ( error != null ) throw ( error ) ;
             //catch (SocketException ex)
             //{
             //    string message = string.Format("Error listening on port {0}. Make sure IIS or another application is not running and consuming your port.", port);
@@ -222,19 +239,23 @@ namespace WebSockets
 					{
 						_clientConnected?.Invoke ( this , connectionDetails ) ;
 						IHttpService service = null ;
+						Exception createServiceException = null ; 
 						try
 						{
 							service = pathManager.createService ( this , connectionDetails ) ;
 						}
 						catch ( Exception x )
 						{ 
-							_connectionErrorRaised?.Invoke ( this , new HttpConnectionDetails ( connectionDetails , x ) ) ;
+							createServiceException = x ;
 						}
 						if ( service == null ) 
 						{
 							service = new BadRequestService () ;
 							service.init ( this , connectionDetails , null ) ;
-							_connectionErrorRaised?.Invoke ( this , new HttpConnectionDetails ( connectionDetails , new SerializationException ( "No path match \"" + connectionDetails.request.uri.LocalPath + "\"" ) ) ) ;						
+							_connectionErrorRaised?.Invoke ( this , new HttpConnectionDetails ( connectionDetails , 
+								createServiceException == null ?
+								new SerializationException ( "No path match \"" + connectionDetails.request.uri.LocalPath + "\"" ) :
+								createServiceException ) ) ;						
 						}
 
 						try
@@ -253,13 +274,16 @@ namespace WebSockets
 							_serverResponded?.Invoke ( this , connectionDetails ) ;
 							//System.Threading.Thread.Sleep ( 2000 ) ; //!!!????!!??????
 						}
-						finally
+						catch ( Exception x )
 						{
-							// forget the connection, we are done with it
-							lock ( _openConnections )
-								_openConnections.Remove ( service ) ;
-							service.Dispose () ;
+							connectionDetails.error = x ;
+							_serviceErrorRaised?.Invoke ( this , connectionDetails ) ;
 						}
+						//	it is beyond my imagination why anyone would use or invente "finally"
+						// forget the connection, we are done with it
+						lock ( _openConnections )
+							_openConnections.Remove ( service ) ;
+						service.Dispose () ;
 					}
 					else _connectionErrorRaised?.Invoke ( this , connectionDetails ) ;
                     
@@ -277,7 +301,7 @@ namespace WebSockets
 				{
 					try
 					{
-						_criticalErrorRaised?.Invoke ( this , connectionDetails == null ? new HttpConnectionDetails ( ex ) : connectionDetails ) ;
+						_serviceErrorRaised?.Invoke ( this , connectionDetails == null ? new HttpConnectionDetails ( ex ) : connectionDetails ) ;
 					}
 					catch { }
 					Stop ( true ) ;
@@ -332,10 +356,10 @@ namespace WebSockets
 			add => _connectionErrorRaised += value ;
 			remove => _connectionErrorRaised -= value ;
 		}
-		public event EventHandler<HttpConnectionDetails> criticalErrorRaised 
+		public event EventHandler<HttpConnectionDetails> serviceErrorRaised 
 		{
-			add => _criticalErrorRaised += value ;
-			remove => _criticalErrorRaised -= value ;
+			add => _serviceErrorRaised += value ;
+			remove => _serviceErrorRaised -= value ;
 		}
 		public event EventHandler disposed 
 		{

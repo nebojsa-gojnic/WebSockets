@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Sockets;
 using Newtonsoft.Json.Linq ;
 using Newtonsoft.Json ;
+using SimpleHttp;
 namespace WebSockets
 {
 	/// <summary>

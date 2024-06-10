@@ -15,96 +15,7 @@ namespace WebSockets
 {
     public class WebSocketService : WebSocketBase , IHttpService
     {
-		///// <summary>
-		///// Auxiliary variable for the webSocketConfigData property
-		///// </summary>
-		//protected WebSocketServiceData _webSocketConfigData ;
-		///// <summary>
-		///// Returns true if this instance is disposed
-		///// </summary>
-		//public WebSocketServiceData webSocketConfigData
-		//{
-		//	get => _webSocketConfigData ;
-		//}
-		///// <summary>
-		///// Configuration data for the WebSocketService class
-		///// </summary>
-		//public class WebSocketServiceData:JObject
-		//{
-		//	/// <summary>
-		//	/// Auxiliary variable for the noDelay property
-		//	/// </summary>
-		//	protected bool _noDelay ;
-		//	/// <summary>
-		//	/// This is applied to NoDelay property of TcpClient class instance
-		//	/// </summary>
-		//	public bool noDelay 
-		//	{
-		//		get => _noDelay ;
-		//	}
-		//	/// <summary>
-		//	/// Creates new instance of WebSocketServiceData class with noDelay propety value set to false
-		//	/// </summary>
-		//	public WebSocketServiceData ( ) : this ( false )
-		//	{
-		//	}
-		//	/// <summary>
-		//	/// Creates new instance of WebSocketServiceData class
-		//	/// </summary>
-		//	/// <param name="noDelay">This is applied to NoDelay property of TcpClient class instance</param>
-		//	public WebSocketServiceData ( bool noDelay )
-		//	{
-		//		_noDelay = noDelay ;	
-		//	}
-		//	/// <summary>
-		//	/// Loads WebSocketService.WebSocketServiceData object with data from json string
-		//	/// </summary>
-		//	/// <param name="json">JSON string</param>
-		//	public override void loadFromJSON ( string json ) 
-		//	{ 
-		//		JObject jo = ( JObject ) JsonConvert.DeserializeObject ( json ) ;
-		//		JToken token = jo [ "noDelay" ] ;
-		//		if ( token == null )
-		//			throw new InvalidDataException ( "Key \"noDelay\" not found in JSON data" ) ;
-		//		switch ( token.Type )
-		//		{
-		//			case JTokenType.String :
-		//				switch ( token.ToObject<string>().ToLower() )
-		//				{
-		//					case "ni" :
-		//					case "ne" :
-		//					case "no" :
-		//					case "false" :
-		//					case "" :
-		//						_noDelay = false ;
-		//					break ;
-		//					default :
-		//						_noDelay = true ;
-		//					break ;
-		//				}
-		//			break ;
-		//			case JTokenType.Boolean :
-		//				_noDelay = token.ToObject<bool>() ;
-		//			break ;
-		//			case JTokenType.Integer :
-		//				_noDelay = token.ToObject<int>() != 0 ;
-		//			break ;
-		//			case JTokenType.Float :
-		//				_noDelay = token.ToObject<double>() != 0 ;
-		//			break ;
-		//			default:
-		//				throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"noDelay\"" ) ;
-		//		}
-		//	}
-		//	/// <summary>
-		//	/// Saves FileHttpService.FileHttpServiceData object to json string
-		//	/// </summary>
-		//	/// <param name="json">JSON string</param>
-		//	public override void saveToJSON ( out string json ) 
-		//	{ 
-		//		json = "{ \"noDelay\":" + JsonConvert.SerializeObject ( noDelay ) + " }" ;
-		//	}
-		//}
+		
 		/// <summary>
 		/// Auxiliary variable for the connection property
 		/// </summary>
@@ -149,7 +60,7 @@ namespace WebSockets
 		/// </summary>
 		/// <param name="server">WebServer instance</param>
 		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
-		/// <param name="configData">(FileHttpServiceData)</param>
+		/// <param name="configData"> WebServerConfigData</param>
 		public virtual void init ( WebServer server , HttpConnectionDetails connection , JObject configData )
 		{
 			_server = server ;

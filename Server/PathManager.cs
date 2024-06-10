@@ -21,7 +21,7 @@ namespace WebSockets
 		/// <param name="serviceType">Real type for IHttpService instance</param>
 		/// <returns>Returns true if path and service addes as new item, 
 		/// <br/>returns false existing path updated with new IHttpService instance.</returns>
-		public virtual bool add ( string path , int severity , string activatorName , Type serviceType , JObject configData )
+		public virtual bool add ( string path , int severity , string activatorName , Type serviceType , WebServerConfigData configData )
 		{
 			return add ( new PathDefinition ( path , severity ) , new HttpServiceActivator ( activatorName , serviceType , configData ) ) ; 
 		}

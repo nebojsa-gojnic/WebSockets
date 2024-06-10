@@ -1,13 +1,30 @@
-﻿using System;
+﻿using System ;
 using Newtonsoft.Json.Linq ;
 using Newtonsoft.Json ;
 namespace WebSockets
 {
+	/// <summary>
+	/// I really hate class factories<br/>
+	/// This holder contains service class type and json data,<br/>
+	/// and that's good enough to make new service on demand.
+	/// </summary>
 	public class HttpServiceActivator
 	{
+		/// <summary>
+		/// Creates new instance of the HttpServiceActivator class<br/>
+		/// serviceType.Name will be used for value of name property.
+		/// </summary>
+		/// <param name="serviceType">Type of service to create</param>
+		/// <param name="configData">JObject created from configData of JSON server configuration</param>
 		public HttpServiceActivator ( Type serviceType , JObject configData ) : this ( serviceType.Name , serviceType , configData )
 		{
 		}
+		/// <summary>
+		/// Creates new instance of the HttpServiceActivator class
+		/// </summary>
+		/// <param name="name">This name should be unique, usually serviceType.Name </param>
+		/// <param name="serviceType">Type of service to create</param>
+		/// <param name="configData">JObject created from configData of JSON server configuration</param>
 		public HttpServiceActivator ( string name , Type serviceType , JObject configData )
 		{
 			_name = name ;
@@ -47,6 +64,12 @@ namespace WebSockets
 		{
 			get => _configData ;
 		}
+		/// <summary>
+		/// Creates new service for the given server and connection
+		/// </summary>
+		/// <param name="server">(WebServer)</param>
+		/// <param name="connection">(HttpConnectionDetails)</param>
+		/// <returns></returns>
 		public IHttpService create ( WebServer server , HttpConnectionDetails connection )
 		{
 			IHttpService service = ( IHttpService ) Activator.CreateInstance ( serviceType ) ;

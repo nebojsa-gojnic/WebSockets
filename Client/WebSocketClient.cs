@@ -123,15 +123,20 @@ namespace WebSockets
 
             string response = string.Empty;
 
+			Exception headerError = null ;
             try
             {
-                response = HttpRequestData.ReadHttpHeader ( stream ) ;
+				HttpHeaderData headerData = new HttpHeaderData ( stream ) ;
+				response = headerData.header ;
+				headerError = headerData.error ;
             }
-            catch (Exception ex)
+            catch ( Exception x )
             {
-                throw new WebSocketHandshakeFailedException("Handshake unexpected failure", ex);
+				headerError = x ;
             }
-
+			
+			
+			if ( headerError != null ) throw new WebSocketHandshakeFailedException ( "Handshake unexpected failure" , headerError ) ;
             // check the accept string
             string expectedAcceptString = base.ComputeSocketAcceptString(secWebSocketKey);
             string actualAcceptString = regex.Match(response).Groups[1].Value.Trim();

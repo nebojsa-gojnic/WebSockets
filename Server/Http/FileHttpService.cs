@@ -9,6 +9,7 @@ using System.Configuration ;
 using System.Xml ;
 using Newtonsoft.Json.Linq ;
 using Newtonsoft.Json ;
+
 namespace WebSockets 
 {
 	/// <summary>
@@ -60,23 +61,23 @@ namespace WebSockets
 			/// Loads FileHttpService.FileHttpServiceData object with data from json string
 			/// </summary>
 			/// <param name="json">JSON string</param>
-			public virtual void loadFromJSON ( JObject obj ) 
+			public virtual void loadFromJSON ( JObject jObject ) 
 			{ 
-				JToken token = obj [ "webroot" ] ;
+				JToken token = jObject [ "webroot" ] ;
 				if ( token == null )
 					throw new InvalidDataException ( "Key \"webroot\" not found in JSON data" ) ;
 				if ( token.Type == JTokenType.String )
 					_webroot = token.ToObject<string>() ;
 				else throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"webroot\"" ) ;
 			}
-			/// <summary>
-			/// Saves FileHttpService.FileHttpServiceData object to json string
-			/// </summary>
-			/// <param name="json">JSON string</param>
-			public virtual void saveToJSON ( out string json ) 
-			{ 
-				json = "{ \"webroot\":" + ( webroot == null ? "" : JsonConvert.SerializeObject ( webroot ) ) + " }" ;
-			}
+			///// <summary>
+			///// Saves FileHttpService.FileHttpServiceData object to json string
+			///// </summary>
+			///// <param name="json">JSON string</param>
+			//public virtual void saveToJSON ( out string json ) 
+			//{ 
+			//	json = "{ \"webroot\":" + ( webroot == null ? "" : JsonConvert.SerializeObject ( webroot ) ) + " }" ;
+			//}
 		}
 
 		/// <summary>
@@ -173,7 +174,7 @@ namespace WebSockets
 						int buffSize = 65536 ;
 						Byte [ ] buffer = new byte [ buffSize ] ;
 						fileStream = File.OpenRead ( fullFileNamePath ) ;
-						responseHeader = connection.request.method.Trim().ToUpper() == "POST" ? RespondChunkedCreated ( contentTypeAndCharset  ) : RespondChunkedSuccess ( contentTypeAndCharset ) ;
+						responseHeader = connection.request.method.Trim().ToUpper() == "POST" ? RespondChunkedCreated ( contentTypeAndCharset ) : RespondChunkedSuccess ( contentTypeAndCharset ) ;
 						int r = fileStream.Read ( buffer , 0 , buffSize ) ;
 						while ( r == buffSize )
 						{
@@ -183,7 +184,7 @@ namespace WebSockets
 						WriteChunk ( buffer , r ) ;
 						WriteFinalChunk () ;
 
-						connection.tcpClient.Client.Shutdown ( SocketShutdown.Send ) ;
+						connection.tcpClient.Client.Shutdown ( SocketShutdown.Send ) ; //??? why did I do this?
 						fileStream.Close () ;
 						fileStream.Dispose () ;
 						return true ;

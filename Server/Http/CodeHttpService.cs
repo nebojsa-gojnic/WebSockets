@@ -4,11 +4,11 @@ using System.IO ;
 using System.Linq ;
 using System.Reflection;
 using System.Text ;
-using HttpMultipartParser ;
-
+using System.Net ;
+using System.Net.Sockets ;
 namespace WebSockets
 {
-	public abstract class CodeHttpService:HttpServiceBase
+	public class CodeHttpService:HttpServiceBase
 	{
 		/// <summary>
 		/// This method should send data back to client
@@ -86,15 +86,36 @@ namespace WebSockets
 						( "Method \"" + name + "\" not found" ) ) ;
 				}
 			}
-			try
-			{
-				HttpServiceBase.WriteHttpHeader ( responseHeader , connection.stream ) ;
-			}
-			catch ( Exception x )
-			{
-				error = x ;
-			}
+			writeDebugHtml ( error , out responseHeader ) ;
+			//try
+			//{
+			//	HttpServiceBase.WriteHttpHeader ( responseHeader , connection.stream ) ;
+			//}
+			//catch ( Exception x )
+			//{
+			//	error = x ;
+			//}
 			return false ;
+		}
+		public void writeDebugHtml ( Exception error , out string responseHeader )
+		{
+			byte [] buffer = getDebugHtmlBytes ( error ) ;
+			int buffSize = 65536 ;
+			MimeTypeAndCharset contentTypeAndCharset = new MimeTypeAndCharset ( "text/html" , "UTF-8" ) ;
+			responseHeader = connection.request.method.Trim().ToUpper() == "POST" ? 
+												RespondChunkedCreated ( contentTypeAndCharset ) : RespondChunkedSuccess ( contentTypeAndCharset ) ;
+			//HttpServiceBase.WriteHttpHeader ( responseHeader , connection.stream ) ;
+			int position = 0 ;
+			int length = buffer.Length - buffSize ;
+			while ( position < length )
+			{
+				WriteChunk ( buffer , position , buffSize ) ;
+				position += buffSize ;
+			}
+			buffSize = buffer.Length - position ;
+			if ( buffSize > 0 ) WriteChunk ( buffer , position , buffSize ) ;
+			WriteFinalChunk () ;
+			connection.tcpClient.Client.Shutdown ( SocketShutdown.Send ) ;
 		}
 		/// <summary>
 		/// Parse and returns string parameters from query(GET)
@@ -156,12 +177,12 @@ namespace WebSockets
 		public static Dictionary<string,HttpFormParameter> getQueryParametersFromMultipartForm ( HttpConnectionDetails connection )
 		{
 			
-			IReadOnlyList<ParameterPart> parameters = MultipartFormDataParser.Parse ( connection.stream ).Parameters ;
-			Dictionary<string,HttpFormParameter> ret = new Dictionary<string, HttpFormParameter> ( parameters.Count ) ;
-			foreach ( ParameterPart par in parameters )
-				if ( ret.ContainsKey ( par.Name ) )
-					ret [ par.Name ].Add ( par.Data ) ;
-				else ret.Add ( par.Name , new HttpFormParameter ( par.Data ) ) ;
+			//IReadOnlyList<ParameterPart> parameters = MultipartFormDataParser.Parse ( connection.stream ).Parameters ;
+			Dictionary<string,HttpFormParameter> ret = new Dictionary<string, HttpFormParameter> ( 0 ) ; //parameters.Count ) ;
+			//foreach ( ParameterPart par in parameters )
+			//	if ( ret.ContainsKey ( par.Name ) )
+			//		ret [ par.Name ].Add ( par.Data ) ;
+			//	else ret.Add ( par.Name , new HttpFormParameter ( par.Data ) ) ;
 			return ret ;
 		}
 		/// <summary>
@@ -224,5 +245,34 @@ namespace WebSockets
 			}
 			return ret ;
 		}
+		/// <summary>
+		/// Returns entire html with message encoded in body as byte[] array
+		/// </summary>
+		public byte [] getDebugHtmlBytes ( Exception error )
+		{
+			return Encoding.UTF8.GetBytes ( getDebugHtml ( error ).ToString() ) ;
+		}
+		/// <summary>
+		/// Returns entire html with message encoded in body
+		/// </summary>
+		public StringBuilder getDebugHtml ( Exception error )
+		{
+			StringBuilder stringBuilder = new StringBuilder () ;
+			stringBuilder.Clear () ;
+			stringBuilder.Append ( "<html>\r\n\t<body>\r\n\t\t" ) ;
+			stringBuilder.Append ( error == null ? "OK" : WebUtility.HtmlEncode ( error.Message ) ) ;
+			stringBuilder.Append ( "\r\n\t</body>\r\n<html>" ) ;
+			return stringBuilder ;
+		}
+		/// <summary>
+		/// This method must be overridden in class implementation
+		/// </summary>
+		/// <param name="uri">Target uri</param>
+		public override Stream GetResourceStream ( Uri uri ) 
+		{
+			MemoryStream ms = new MemoryStream ( getDebugHtmlBytes ( null ) ) ;
+			ms.Position = 0 ;
+			return ms ;
+		}	
 	}
 }
