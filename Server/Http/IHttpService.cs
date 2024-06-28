@@ -2,8 +2,7 @@
 using System.IO;
 using System.Net.Sockets;
 using Newtonsoft.Json.Linq ;
-using Newtonsoft.Json ;
-using SimpleHttp;
+using SimpleHttp ;
 namespace WebSockets
 {
 	/// <summary>
@@ -24,7 +23,7 @@ namespace WebSockets
 		/// </summary>
 		/// <param name="uri">Target uri</param>
 		/// <returns>stream to resource specified by given uri</returns>
-		Stream GetResourceStream ( Uri uri );
+		Stream GetResourceStream ( Uri uri ) ;
 
 		
 

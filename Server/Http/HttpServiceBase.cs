@@ -1,9 +1,8 @@
 ﻿using System ;
 using System.IO ;
-using System.Runtime.CompilerServices;
 using System.Text ;
+using System.Reflection ;
 using Newtonsoft.Json.Linq ;
-using Newtonsoft.Json ;
 namespace WebSockets
 {
 	/// <summary>
@@ -93,7 +92,6 @@ namespace WebSockets
 		}
 		/// <summary>
 		/// This method should send data back to client
-        /// </summary>
 		/// </summary>
 		/// <param name="responseHeader">Resonse header</param>
 		/// <param name="error">Code execution error(if any)</param>
@@ -384,10 +382,51 @@ namespace WebSockets
 			else path = path.Replace ( "%20" , " " ) ; //   System.Web.HttpUtility.UrlDecode ( path ) ;
             return webroot + path ;
         }
-		public static void WriteHttpHeader ( string response , Stream stream )
+		/// <summary>
+		/// This method opens manifest resource stream defined by given name (resourceName),<br/>
+		/// reads returns all text from it.
+		/// </summary>
+		/// <param name="resourceName">It is string like "WebSockets.Server.Http.DefaultCodeStyle.css".<br/>
+		/// Search C# resources on internet. </param>
+		/// <returns>Retrurns entire content of the resource as text.</returns>
+		public static string getTextFromFileResource ( string resourceName )
+        {
+			Stream resourceStream = null ;
+			Exception error = null ;
+			StreamReader reader = null ;
+			string returnValue = "" ;
+			try
+			{
+				resourceStream = Assembly.GetExecutingAssembly().GetManifestResourceStream ( resourceName ) ;
+				reader = new StreamReader ( resourceStream ) ;
+				returnValue = reader.ReadToEnd () ;
+			}
+			catch ( Exception x )
+			{
+				error = x ;
+			}
+
+			try
+			{ 
+				if ( resourceStream != null )
+				{
+					resourceStream.Close () ;
+					resourceStream.Dispose () ;
+				}
+				reader?.Dispose () ;
+			}
+			catch { }
+			if ( error != null ) throw ( error ) ;
+			return returnValue ;
+		}
+		/// <summary>
+		/// This method take given text, trims it, adds double end of line sequence and writes it into stream with ASCII decoding
+		/// </summary>
+		/// <param name="text">Header text</param>
+		/// <param name="stream">Stream to write to</param>
+		public static void WriteHttpHeader ( string text , Stream stream )
 		{
-			response = response.Trim() + Environment.NewLine + Environment.NewLine ;
-			Byte[] bytes = Encoding.ASCII.GetBytes ( response ) ;
+			Byte[] bytes = Encoding.ASCII.GetBytes ( text.Trim() + "\r\n\r\n" ) ;
 			stream.Write ( bytes , 0 , bytes.Length ) ;
 		}
 		

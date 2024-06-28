@@ -3,6 +3,7 @@ using System.Collections.Generic ;
 using System.Collections ;
 using System.Text ;
 using System.Text.RegularExpressions ;
+using System.Diagnostics.Eventing.Reader;
 
 namespace WebSockets
 {
@@ -93,8 +94,9 @@ namespace WebSockets
 				_search = null ;
 				segments = ( path.IndexOf ( '*' ) == -1 ) && ( path.IndexOf ( '?' ) == -1 ) ? null : getPathSegments ( path ) ;
 			}
-			else 
-				_search = ( ( _path.IndexOf ( '*' ) == -1 ) && ( _path.IndexOf ( '?' ) == -1 ) ) ? null : new Regex ( _path.Replace ( "*" , ".*" ).Replace ( "?" , "[^\\.]" ) , RegexOptions.CultureInvariant | RegexOptions.Compiled ) ;
+			else if (  _path.LastIndexOf ( '/' ) == _path.Length - 1 ) 
+				_search = new Regex ( ( _path.Replace ( "*" , ".*" ).Replace ( "?" , "[^\\.]" ) + ".*" ) , RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled ) ;
+			else _search = ( ( _path.IndexOf ( '*' ) == -1 ) && ( _path.IndexOf ( '?' ) == -1 ) ) ? null : new Regex ( _path.Replace ( "*" , ".*" ).Replace ( "?" , "[^\\.]" ) , RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled ) ;
 		}
 		public static PathSegment[] getPathSegments ( string path )
 		{

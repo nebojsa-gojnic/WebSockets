@@ -125,9 +125,8 @@ namespace WebSockets
             return false ;
         }
 		/// <summary>
-		/// This method sends file from file system over HTTP
+		/// This method sends a file from the file system over HTTP
         /// </summary>
-		/// </summary>
 		/// <param name="responseHeader">Resonse header</param>
 		/// <param name="error">Code execution error(if any)</param>
 		/// <returns>Should returns true if response is 400 and everything OK</returns>
@@ -200,11 +199,7 @@ namespace WebSockets
 			}
 			try
 			{ 
-				if ( fileStream != null )
-				{
-					fileStream.Close () ;
-					fileStream.Dispose () ;
-				}
+				fileStream?.Dispose () ;
 			}
 			catch {}
 			return false ;
@@ -235,7 +230,5 @@ namespace WebSockets
 			}
 			return File.OpenRead ( fullFileNamePath ) ; 
 		}
-
-
     }
 }

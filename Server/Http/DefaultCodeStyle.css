@@ -1,0 +1,92 @@
+﻿* 
+{
+	font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif ;
+	font-size: 0px ;
+	color: #444 ;
+	box-sizing: border-box ;
+}
+td
+{
+	vertical-align: baseline ;
+}
+input , select , option , span , div , textarea
+{
+	font-size: 14px ;
+}
+
+input[type="button"] ,
+input[type="submit"] 
+{
+	background-color: #F7F0E6 ;
+	padding: 3px 8px 2px 8px ; 
+	border: 1px solid gray ;
+	border-radius: 2px ;
+	outline: none ;
+}
+input[type="button"]:hover ,
+input[type="submit"]:hover
+{
+	background-color: #FFFFF0 ;
+}
+input[type="button"]:active ,
+input[type="submit"]:active
+{
+	background-color: #E0E0D0 ;
+	color: transparent ;
+	text-shadow: 1px 1px #444 ;
+}
+
+textarea , 
+input[type="text"] 
+{
+	padding: 3px 6px 2px 6px ; 
+	border: 1px solid gray ;
+	border-radius: 2px ;
+	min-width: 200px ;
+}
+select
+{
+	padding: 2px 6px 2px 3px ; /* #$#@@!!!!!  */
+	border: 1px solid gray ;
+	border-radius: 2px ;
+}
+textarea:focus ,
+select:focus ,
+input[type="text"]:focus
+{
+	outline-offset: 0px ;
+	outline: 0.5px solid #444 ;
+}
+body > div
+{
+	font-weight: bold ;
+}
+body > div > div
+{
+	margin-left: 10px ;
+	font-weight: 100 ;
+}
+form 
+{
+	font-size : 0px ;
+	margin: 0px ;
+	padding: 0px ;
+	display: inline-block ;
+}
+table tr > td:first-child
+{
+	text-align: right ;
+}
+table
+{
+	background-color: whitesmoke ;
+	display: inline-table ;
+	padding: 10px ;
+	margin: 10px ;
+}
+#mainDiv
+{
+	background-color: antiquewhite ; 
+	display: none ;  
+	padding: 10px ;
+}

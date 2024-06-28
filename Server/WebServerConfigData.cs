@@ -26,9 +26,13 @@ namespace WebSockets
 			settings.Formatting = Formatting.Indented ;
 			_jsonSerializer = JsonSerializer.Create ( settings ) ;
 		}
-		public static void json2string ( JObject jObject , StringBuilder stringBuilder  )
+		public static void json2string ( JObject jObject , StringBuilder stringBuilder )
 		{
-			stringBuilder.Clear () ;
+			json2string ( jObject , stringBuilder , false ) ;
+		}
+		public static void json2string ( JObject jObject , StringBuilder stringBuilder , bool append )
+		{
+			if ( !append ) stringBuilder.Clear () ;
 			StringWriter sw = new StringWriter ( stringBuilder ) ;
 			JsonTextWriter jsonTextWriter = new JsonTextWriter ( sw ) ;
 			jsonTextWriter.Formatting = Formatting.Indented ;
@@ -375,10 +379,10 @@ namespace WebSockets
 		{
 			if ( obj == null ) throw new InvalidDataException ( "Invalid JSON type for the field \"service\", object expected" ) ;
 			JToken token = obj.GetValue ( "service" ) ;
-			if ( token == null ) throw new InvalidDataException ( "JSON error, field \"service\" not found in \"service\" section" ) ;
+			if ( token == null ) throw new InvalidDataException ( "Field \"service\" not found in \"service\" section" ) ;
 			string name = token.ToString () ;
 			token = obj.GetValue ( "source" ) ;
-			if ( token == null ) throw new InvalidDataException ( "JSON error, field \"source\" not found in \"service\" section" ) ;
+			if ( token == null ) throw new InvalidDataException ( "Field \"source\" not found in \"service\" section" ) ;
 			Type serviceType = loadType ( token.ToString () , name ) ;
 			if ( serviceType == null ) throw new InvalidDataException ( "Cannot create type for service \"" + name + "\"" ) ;
 			return new KeyValuePair<string,HttpServiceActivator> ( name , new HttpServiceActivator ( name , serviceType , obj.GetValue ( "configData" ) as JObject ) ) ;
@@ -483,7 +487,7 @@ namespace WebSockets
 								if ( ret.ContainsKey ( item.Key ) ) 
 								{
 									if ( ret [ item.Key ] != item.Value )
-										throw new InvalidDataException ( "JSON error, ambiguous service name on path \"" + item.Key.ToString() + "\"." ) ;
+										throw new InvalidDataException ( "Ambiguous service name on path \"" + item.Key.ToString() + "\"." ) ;
 								}
 								else ret.Add ( item.Key , item.Value ) ;
 							}
@@ -506,10 +510,10 @@ namespace WebSockets
 		public static KeyValuePair<PathDefinition,string> loadPathDemand ( JObject obj )
 		{
 			JToken token = obj.GetValue ( "service" ) ;
-			if ( token == null ) throw new InvalidDataException ( "JSON error, field \"service\" not found in path definition section." ) ;
+			if ( token == null ) throw new InvalidDataException ( "Field \"service\" not found in path definition section." ) ;
 			string service = token.ToString () ;
 			token = obj.GetValue ( "path" ) ;
-			if ( token == null ) throw new InvalidDataException ( "JSON error, field \"path\" not found in path definition section." ) ;
+			if ( token == null ) throw new InvalidDataException ( "Field \"path\" not found in path definition section." ) ;
 			string path = token.ToString () ;
 			token = obj.GetValue ( "severity" ) ;
 			int severity = 0 ;
@@ -623,12 +627,12 @@ namespace WebSockets
 			_sslCertificateIssuer = null ;
 			_sslCertificateSubject = null ;
 
-			if ( token == null ) throw new InvalidDataException ( "JSON error, field \"port\" not found" ) ;
+			if ( token == null ) throw new InvalidDataException ( "Field \"port\" not found" ) ;
 			switch ( token.Type )
 			{
 				case JTokenType.String :
 					if ( !int.TryParse ( token.ToString () , out _port ) )
-						throw new InvalidDataException ( "JSON error, invalid value \"" + token.ToString() + "\" for the field \"port\"" ) ;
+						throw new InvalidDataException ( "Invalid value \"" + token.ToString() + "\" for the field \"port\"" ) ;
 				break ;
 				case JTokenType.Integer :
 				case JTokenType.Float :
@@ -642,7 +646,7 @@ namespace WebSockets
 				_sitename = null ;
 			else if ( token.Type == JTokenType.String )
 				_sitename = token.ToString () ;
-			else throw new InvalidDataException ( "JSON error, invalid value \"" + token.ToString() + "\" for the field \"sitename\"" ) ;
+			else throw new InvalidDataException ( "Invalid value \"" + token.ToString() + "\" for the field \"sitename\"" ) ;
 			
 			token = GetValue ( "sslCertificate" ) ;
 			if ( token == null )
@@ -651,7 +655,7 @@ namespace WebSockets
 				_sslCertificateSource = null ;
 			else if ( token.Type == JTokenType.String )
 				_sslCertificateSource = token.ToString () ;
-			else throw new InvalidDataException ( "JSON error, invalid value \"" + token.ToString() + "\" for the field \"sslCertificate\"" ) ;
+			else throw new InvalidDataException ( "Invalid value \"" + token.ToString() + "\" for the field \"sslCertificate\"" ) ;
 			
 			token = GetValue ( "sslCertificatePassword" ) ;
 			if ( token == null )
@@ -660,7 +664,7 @@ namespace WebSockets
 				_sslCertificatePassword = null ;
 			else if ( token.Type == JTokenType.String )
 				_sslCertificatePassword = token.ToString () ;
-			else throw new InvalidDataException ( "JSON error, invalid value \"" + token.ToString() + "\" for the field \"sslCertificatePassword\"" ) ;
+			else throw new InvalidDataException ( "Invalid value \"" + token.ToString() + "\" for the field \"sslCertificatePassword\"" ) ;
 			
 
 			token = GetValue ( "sslProtocol" ) ;
@@ -693,18 +697,18 @@ namespace WebSockets
 					default :
 						if ( string.IsNullOrWhiteSpace ( _sslCertificateSource ) )
 							_sslProtocol = SslProtocols.Tls12 ;
-						else throw new InvalidDataException ( "JSON error, invalid value \"" + token.ToString() + "\" for the field \"sslProtocol\"" ) ;
+						else throw new InvalidDataException ( "Invalid value \"" + token.ToString() + "\" for the field \"sslProtocol\"" ) ;
 					break ;
 				}
 
 			JToken servicesToken = GetValue ( "services" ) ;
 			JToken pathsToken = GetValue ( "paths" ) ;
-			if ( servicesToken == null ) throw new InvalidDataException ( "JSON error, field \"services\" not found" ) ;
-			if ( servicesToken.Type != JTokenType.Array ) throw new InvalidDataException ( "JSON error, invalid type for the field \"services\", expected array" ) ;
+			if ( servicesToken == null ) throw new InvalidDataException ( "Field \"services\" not found" ) ;
+			if ( servicesToken.Type != JTokenType.Array ) throw new InvalidDataException ( "Invalid type for the field \"services\", expected array" ) ;
 			IList<Exception> ls = ( List<Exception> ) _errorList ;
 			
-			if ( pathsToken == null ) throw new InvalidDataException ( "JSON error, field \"paths\" not found" ) ;
-			if ( pathsToken.Type != JTokenType.Array ) throw new InvalidDataException ( "JSON error, invalid type for the field \"paths\", expected array" ) ;
+			if ( pathsToken == null ) throw new InvalidDataException ( "Field \"paths\" not found" ) ;
+			if ( pathsToken.Type != JTokenType.Array ) throw new InvalidDataException ( "Invalid type for the field \"paths\", expected array" ) ;
 
 			_services = loadServices ( ( JArray ) servicesToken , out _serviceDemandCount , ref ls ) ;
 			_pathDemands = loadPathDemands ( ( JArray ) pathsToken , ref ls ) ;
@@ -755,11 +759,12 @@ namespace WebSockets
 		{
 			get => _jsonConfigFile ;
 		}
-		public void loadFromJSONFile ( string fileName )
+		public void loadFromJSONFile ( string fileName , out string jsonText )
 		{
 			Exception error = null ;
 			TextReader reader = null ;
 			JObject obj = null ;
+			jsonText = "{}" ;
 			try
 			{
 				if ( File.Exists ( fileName ) )
@@ -767,7 +772,7 @@ namespace WebSockets
 					FileInfo fileInfo = new FileInfo ( fileName ) ;
 					_jsonConfigFile = fileInfo.FullName ;
 					reader = new StreamReader ( fileName ) ;
-					obj = JsonConvert.DeserializeObject <JObject> ( reader.ReadToEnd () ) ;
+					obj = JsonConvert.DeserializeObject <JObject> ( jsonText = reader.ReadToEnd () ) ;
 					if ( obj == null ) throw new InvalidDataException ( "Invalid JSON configuration, single JSON object expected" ) ;
 				}
 				else throw new IOException ( "JSON configuration file not found\r\n\"" + fileName + "\"" ) ;

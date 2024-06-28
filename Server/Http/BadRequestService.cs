@@ -1,16 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Net.Sockets;
-using System.IO;
+﻿using System ;
+using System.Text ;
+using System.Net.Sockets ;
+using System.IO ;
 
 namespace WebSockets
 {
+	/// <summary>
+	/// Simple example for http service
+	/// </summary>
     public class BadRequestService : HttpServiceBase
     {
 
+		/// <summary>
+		/// Responds with "HTTP/1.1 400 Bad Request" ;
+		/// </summary>
+		/// <param name="mimeTypesByFolder">Not used</param>
+		/// <param name="responseHeader">"HTTP/1.1 400 Bad Request"</param>
+		/// <param name="codeError">Probably null</param>
+		/// <returns>Always false</returns>
         public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
         {
 			responseHeader = "HTTP/1.1 400 Bad Request" ;
@@ -34,6 +41,9 @@ namespace WebSockets
 		{
 			return null ;
 		}
+		/// <summary>
+		/// Does nothing
+		/// </summary>
         public override void Dispose()
         {
             // do nothing

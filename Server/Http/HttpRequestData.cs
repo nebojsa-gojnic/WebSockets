@@ -5,6 +5,7 @@ using WebSockets ;
 using System.Text.RegularExpressions ;
 using System.Net.NetworkInformation;
 using System.Net;
+using System.Net.Mime;
 namespace WebSockets
 {
 	/// <summary>
@@ -41,9 +42,9 @@ namespace WebSockets
 		/// </summary>
 		public readonly string firstLine  ;
 		/// <summary>
-		/// Entire header string
+		/// Object with firstline, header text and some crucial header attributes
 		/// </summary>
-		public readonly string header ;
+		public readonly HttpHeaderData header ;
 		/// <summary>
 		/// Auxiliary variable for the error property value
 		/// </summary>
@@ -68,7 +69,7 @@ namespace WebSockets
 		{
 			this.uri = uri ;
 			method = "GET" ;
-			header = "" ;
+			header = new HttpHeaderData () ;
 			secure = uri.GetLeftPart ( UriPartial.Scheme ) == "https" ;
 		}
 		///// <summary>
@@ -82,7 +83,7 @@ namespace WebSockets
 		/// <param name="header">Header to read data from</param>
 		public HttpRequestData ( bool secure , HttpHeaderData headerData )
 		{
-			this.header = headerData.header ;
+			this.header = headerData ;
 			this.firstLine = headerData.firstLine ;
 			path = "" ;
 			this.secure = secure ;
@@ -94,14 +95,14 @@ namespace WebSockets
 				path = firstLine.Substring ( i0 + 1 , i1 - i0 - 2 ) ;
 				protocol = firstLine.Substring ( i1 ) ;
 					
-				i0 = header.IndexOf ( "Host:" , StringComparison.OrdinalIgnoreCase ) ;
+				i0 = headerData.headerText.IndexOf ( "Host:" , StringComparison.OrdinalIgnoreCase ) ;
 				if ( i0 > -1 )
 				{
-					i1 = header.IndexOf ( "\r\n" , i0 + 1 ) ;
+					i1 = headerData.headerText.IndexOf ( "\r\n" , i0 + 1 ) ;
 					
 					try
 					{
-						uri = new Uri ( "http" + ( secure ? "s" : "" ) + "://" + header.Substring ( i0 + 5  , i1 - i0 - 5 ).Trim() + path , UriKind.RelativeOrAbsolute ) ;
+						uri = new Uri ( "http" + ( secure ? "s" : "" ) + "://" + headerData.headerText.Substring ( i0 + 5  , i1 - i0 - 5 ).Trim() + path , UriKind.RelativeOrAbsolute ) ;
 					}
 					catch ( Exception x )
 					{ 
@@ -109,10 +110,10 @@ namespace WebSockets
 					}
 				}
 				// check if this is a web socket upgrade request
-				connectionType = new Regex ( "Upgrade: websocket" , RegexOptions.IgnoreCase ).Match ( header ).Success ? HttpConnectionType.WebSocket : HttpConnectionType.Http ;
+				connectionType = new Regex ( "Upgrade: websocket" , RegexOptions.IgnoreCase ).Match ( headerData.headerText ).Success ? HttpConnectionType.WebSocket : HttpConnectionType.Http ;
             }
             else connectionType = HttpConnectionType.Unknown ;
 		}
-		
+			 
     }
 }

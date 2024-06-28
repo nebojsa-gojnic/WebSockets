@@ -121,7 +121,7 @@ namespace WebSockets
         }
         protected override void PerformHandshake ( Stream stream )
         {
-            string header = connection.request.header ;
+            string header = connection.request.header.headerText ;
 
             try
             {

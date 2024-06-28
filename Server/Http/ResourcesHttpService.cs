@@ -247,12 +247,12 @@ namespace WebSockets
 						}
 						try
 						{
-							if ( reourceStream  != null ) reourceStream.Close () ;
+							reourceStream?.Close () ;
 						}
 						catch {}
 						try
 						{
-							if ( reourceStream  != null ) reourceStream.Dispose () ;
+							reourceStream?.Dispose () ;
 						}
 						catch {}
 					}

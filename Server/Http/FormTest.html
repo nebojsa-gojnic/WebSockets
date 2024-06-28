@@ -1,0 +1,436 @@
+<html>
+<body>
+	<script type="text/javascript">
+  
+	var actionSelect ;
+	var formatSelect ;
+	var submitButton ;
+	var controlTable ;
+	var jsonTable ;
+	var sendButton ;
+	var mainDiv ;
+	function readTextJustForStyle ( text )
+	{
+		return readText ( text , true ) ;
+	}
+    function readText ( text , justForStyle )
+    {
+  		var form = document.forms [ 0 ] ;
+  		document.body.removeChild ( mainDiv ) ; //remove form
+		  
+  		const i = text.indexOf ( "<body>\r\n" ) ;
+  		if ( i == -1 )
+  			document.body.innerHTML = text ;
+  		else 
+  		{
+  			const i1 = text.indexOf ( i + 8 , "</body>\r\n" ) ;			//!!!! ;)
+			document.body.innerHTML = i1 == -1 ? text.substring ( i + 8 ) : text.substring ( i + 8 , i1 + 1 ) ;
+  		}
+		
+		if ( justForStyle )
+		{
+			var node = document.body.firstChild ;
+			while ( node )
+			{
+				var nextNode = node.nextSibling ;
+				if ( node.tagName != "STYLE" )
+					document.body.removeChild ( node ) ;
+				node = nextNode ;
+			}
+		}
+		// put form back
+		mainDiv.style.display = "inline-block" ;
+  		document.body.insertBefore ( mainDiv, document.body.firstChild ) ;
+    }
+  	function sayNo ( e )
+  	{
+  		alert ( e.toString() ) ;
+  	}
+	function getUriData ( ) 
+	{
+ 		var formData = "" ;
+ 		var elements = document.forms [ 0 ].getElementsByTagName ( "select" ) ; 
+		var length = elements.length ;
+		var i ;
+		for ( i = 0 ; i < length ; i++ )  
+			formData = formData + encodeURI ( elements [ i ].name ) + "=" + encodeURI ( elements [ i ].value + "&" ) ;	
+
+ 		elements = document.forms [ 0 ].getElementsByTagName ( "textarea" ) ; 
+		length = elements.length ;
+		for ( i = 0 ; i < length ; i++ )  
+			formData = formData + encodeURI ( elements [ i ].name ) + "=" + encodeURI ( elements [ i ].value + "&" ) ;	
+
+		elements = document.forms [ 0 ].getElementsByTagName ( "input" ) ; 
+		length = elements.length ;
+		for ( i = 0 ; i < length ; i++ )  
+		{
+			var element = elements [ i ] ;
+			switch ( element.type )
+			{
+				case "button" :
+				case "submit" :
+				break ;
+				default :
+					formData = formData + encodeURI ( elements [ i ].name ) + "=" + encodeURI ( elements [ i ].value + "&") ;	
+				break ;
+			}
+		}
+		return formData.length == 0 ? formData : formData.substring ( 0 , formData.length - 1 ) ;
+ 	}
+	function getJsonData ( ) 
+	{
+  		const jsonData = {}
+		var i ;
+  		var elements = document.forms  [ 0 ].getElementsByTagName ( "select" ) ; 
+		var length = elements.length ;
+		for ( i = 0 ; i < length ; i++ )  
+			jsonData [ elements [ i ].name ] = elements [ i ].value  ;	
+  		
+		elements = document.forms  [ 0 ].getElementsByTagName ( "textarea" ) ; 
+		length = elements.length ;
+		for ( i = 0 ; i < length ; i++ )  
+			jsonData [ elements [ i ].name ] = elements [ i ].value  ;	
+
+		elements = document.forms  [ 0 ].getElementsByTagName ( "input" ) ; 
+		length = elements.length ;
+		for ( i = 0 ; i < length ; i++ )  
+		{
+			var element = elements [ i ] ;
+			if ( element.name == "" ) continue ;
+			switch ( element.type )
+			{
+				case "button" :
+				case "submit" :
+				break ;
+				default :
+					jsonData [ element.name ] = element.value  ;	
+				break ;
+			}
+		}
+		return jsonData ;
+  	}
+	function sendForm ( justForStyle ) 
+	{
+		if ( methodSelect.value == "post" )
+			postForm ( justForStyle ) 
+		else getForm ( justForStyle ) 
+	}
+	function postForm ( justForStyle ) 
+	{
+		switch ( formatSelect.value )
+		{
+			case "multipart/form-data" :
+				fetch ( document.forms [ 0 ].action , 
+				{
+					method: "post" ,
+					/*headers: { "Content-Type": "multipart/form-data; charset=utf-8" } ,*/
+					body: new FormData ( document.forms [ 0 ] )
+				} ).then ( justForStyle ? readDataFromResponseJustForStyle : readDataFromResponse , sayNo ) ;
+			break ;
+			case "application/x-www-form-urlencoded" :
+				fetch ( document.forms [ 0 ].action , 
+				{
+					method: "post" ,
+					headers: { "Content-Type": "application/x-www-form-urlencoded; charset=utf-8" } ,
+					body: getUriData () 
+				} ).then ( justForStyle ? readDataFromResponseJustForStyle : readDataFromResponse , sayNo ) ;
+			break ;
+			case "application/json" :
+				fetch ( actionSelect.value , 
+				{
+					method: "post" ,
+					headers: { "Content-Type": "application/json; charset=utf-8" } ,
+					body: JSON.stringify ( getJsonData () )
+				} ).then ( justForStyle ? readDataFromResponseJustForStyle : readDataFromResponse , sayNo ) ;
+			break ;
+			default :
+				return ;
+		}
+  	}
+	function getForm ( justForStyle ) 
+	{
+		switch ( formatSelect.value )
+		{
+			case "multipart/form-data" :
+				var styleElement = document.body.getElementsByTagName ( "style" ) [ 0 ] ;
+				readText ( "<html>\r\n<body>\r\n\t<div>multipart/form-data cannot be sent with GET method</div>\r\n</body>\r\n</html>" , false ) ;
+				if ( styleElement ) document.body.append ( styleElement ) ;
+			break ;
+			case "application/x-www-form-urlencoded" :
+				fetch ( document.forms [ 0 ].action  + "?" + getUriData () , 
+				{
+					method: "get" ,
+					headers: { "Content-Type": "application/x-www-form-urlencoded; charset=utf-8" } ,
+				} ).then ( justForStyle ? readDataFromResponseJustForStyle : readDataFromResponse , sayNo ) ;
+			break ;
+			case "application/json" :
+				fetch ( actionSelect.value + "?json=" + encodeURI ( JSON.stringify ( getJsonData () ) ) , 
+				{
+					method: "get" ,
+					headers: { "Content-Type": "application/json" } ,
+				} ).then ( justForStyle ? readDataFromResponseJustForStyle : readDataFromResponse , sayNo ) ;
+			break ;
+			default :
+				return ;
+		}
+ 	}
+	function readDataFromResponseJustForStyle ( response )
+	{
+		response.text().then ( readTextJustForStyle , sayNo ) ;
+		//read ( response.body.getReader () ) ;
+	}
+	function readDataFromResponse ( response )
+	{
+		response.text().then ( readText , sayNo ) ;
+	}
+	function sendCustomJson (  )
+	{
+		try
+		{
+			var jObject = JSON.parse ( jsonText.value ) ; //check syntax before sening
+			fetch ( "/debug/jsonTestMethod"  , 
+			{
+				method: "post" ,
+				headers: { "Content-Type": "application/json; charset=utf-8" } ,
+				body: jsonText.value 
+			} ).then ( readDataFromResponse , sayNo ) ;
+		}
+		catch ( x )
+		{
+			var s = x.toString () ;
+			try
+			{
+				var i = s.lastIndexOf ( ' ' ) ;
+				if ( i != -1 )
+				{
+					i = Math.round ( s.substring ( i ) , 0 ) ;
+					if ( i > 0 ) i-- ;
+					jsonText.focus () ;
+					jsonText.selectionStart = i ;
+					jsonText.selectionEnd = i + 3 ;
+				}
+			}
+			catch ( x1 ) {}
+			alert ( s ) ;
+		}
+		
+	}
+	function actionSelect_Click ( e )
+	{
+		document.forms [ 0 ].action = e.srcElement.value ;
+	}
+	function methodSelect_Click ( e )
+	{
+		document.forms [ 0 ].method = e.srcElement.value ;
+		if ( e.srcElement.value == "get" )
+		{
+			sendButton.value = "Get via javascript" ;
+			submitButton.value = "Submit form(GET)" ;
+		}
+		else 
+		{
+			sendButton.value = "Post via javascript" ;
+			submitButton.value = "Submit form(POST)" ;
+		}
+	}
+	function sendButton_Click ( e )
+	{
+		sendForm  ( ) ;
+	}		   
+	function sendJSONButton_Click ( e )
+	{
+		sendCustomJson ( ) ;
+	}		   
+	
+  	addEventListener ( "DOMContentLoaded" , ( event ) =>
+		{
+			actionSelect = document.getElementById ( "actionSelect" ) ;
+			formatSelect = document.getElementById ( "formatSelect" ) ;
+			submitButton = document.getElementById ( "submitButton" ) ;
+			controlTable = document.getElementById ( "controlTable" ) ;
+			jsonTable = document.getElementById ( "jsonTable" ) ;
+			jsonText = document.getElementById ( "jsonText" ) ;
+			sendButton = document.getElementById ( "sendButton" ) ;
+			mainDiv = document.getElementById ( "mainDiv" ) ;
+			sendButton.addEventListener ( "click" , sendButton_Click ) ;
+			formatSelect = document.getElementById ( "formatSelect" ) ;
+
+	
+			const methodSelect = document.getElementById ( "methodSelect" ) ;
+			methodSelect.addEventListener ( "click" , methodSelect_Click ) ;
+			methodSelect.addEventListener ( "blur" , methodSelect_Click ) ;
+			actionSelect = document.getElementById ( "actionSelect" ) ;
+			actionSelect.addEventListener ( "click" , actionSelect_Click ) ;
+			actionSelect.addEventListener ( "blur" , actionSelect_Click ) ;
+			methodSelect_Click ( { srcElement : methodSelect } ) ;
+			document.forms [ 0 ].action = actionSelect.value ;		
+			
+			document.getElementById ( "sendJSONButton" ).addEventListener ( "click" , sendJSONButton_Click ) ;
+
+
+			//var mutationObserver = window.MutationObserver || window.WebKitMutationObserver ;
+			var observer = new MutationObserver ( function ( mutations , observer ) 
+			{
+				jsonTable.style.width = ( jsonText.offsetLeft - jsonTable.offsetLeft + jsonText.offsetWidth ).toString () + "px" ;
+				jsonText.parentElement.style.height = jsonText.offsetHeight.toString () + "px" ; 
+			} ) ;
+
+			observer.observe ( jsonText , 
+				{
+					jsonText: true ,
+					childList: false ,
+					attributes: true ,
+					attributeFilter: [ "style" ]
+				} ) ;
+
+			postForm ( true ) ;
+	  	} ) ;
+  // ...
+	</script>
+	<span id="mainDiv" style="display: none;">
+		<table id="jsonTable" style="">
+			<tr>
+				<td style="text-align:left"><span>Custom JSON:</span></td>
+				<td style="text-align:right"><input type="button" id="sendJSONButton" value="Send JSON"></input></td>
+			</tr>
+			<tr rowspan="3">
+				<td colspan="2"><textarea id="jsonText" style="width:600px;height:300px">{
+	"port": 50080 ,
+	"sitename": "localhost" ,
+	"sslCertificate": "I:\\Code\\localhost2.pfx" ,
+	"sslCertificatePassword": "password" ,
+	"sslProtocol": "Tls12" ,
+	"services": 
+	[
+		{
+			"service": "debugHttpService" ,
+			"source": "WebSockets.DebugHttpService, WebSockets" ,
+			"configData": {			}
+		} ,
+		{
+			"service": "fileHttpService" ,
+			"source": "WebSockets.FileHttpService, WebSockets" ,
+			"configData": 
+			{			
+				"webroot": "I:\\Code\\Nodes\\PipeMania\\PipeManiaService\\Resources" 
+			}
+		}
+	] ,
+	"paths" :
+	[
+		{
+			"service": "debugHttpService" ,
+			"path": "/debug/*" 
+		} ,
+		{
+			"service": "debugHttpService" ,
+			"path": "/debug" 
+		} ,
+		{
+			"service": "debugHttpService" ,
+			"path": "/FormTest.html"
+		} ,
+		{
+			"service": "fileHttpService" ,
+			"path": "/*"
+		}
+	]
+}</textarea>
+			</tr>
+		</table>
+		<span style="display:inline-block">
+			<form action="/debug" id="form1" name="formName1" method="post" style="">
+				<table>
+					<tr>
+						<td>
+							<span>name1:</span>
+						</td>
+						<td>
+							<input id="text1" name="name1" type="text" value="textvalue1" />
+						</td>
+					</tr>
+					<tr>
+						<td>
+							<span>name2:</span>
+						</td>
+						<td>
+							<input id="text2" name="name2" type="text" value="textvalue2" /><br />
+						</td>
+					</tr>
+					<tr>
+						<td>
+							<span>cars:</span>
+						</td>
+						<td>
+							<select name="cars" id="cars">
+								<option value="volvo">Volvo</option>
+								<option value="saab">Saab</option>
+								<option value="mercedes">Mercedes</option>
+								<option value="audi">Audi</option>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<td>
+							<span>Text:</span>
+						</td>
+						<td>
+							<textarea autofocus id="textarea1" name="textarea1">1šðš</textarea>
+						</td>
+					</tr>
+					<tr>
+						<td>
+						</td>
+						<td style="text-align:right">
+							<input type="submit" id="submitButton" value="Submit as form"></input>
+						</td>
+					<tr/>
+				</table>
+			</form>
+			<table id="controlTable" style="">
+				<tr>
+					<td>
+						<span>Method:</span>
+					</td>
+					<td>
+						<select id="methodSelect">
+							<option value="post" selected>Post</option>
+							<option value="get">Get</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<td >
+						<span>Format:</span>
+					</td>
+					<td >
+						<select id="formatSelect">
+							<option value="multipart/form-data">form-data</option>
+							<option value="application/x-www-form-urlencoded">url-encoded</option>
+							<option value="application/json">json</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<td>
+						<span>Action:</span>
+					</td>
+					<td>
+						<select id="actionSelect">
+							<option value="/debug" selected>debug</option>
+							<option value="/debug/parameterTestMethod">form test</option>
+						</select>
+					</td>
+				</tr>
+				<tr rowspan="2">
+					<td>
+					</td>
+					<td>
+						<input type="button" id="sendButton" value="Post via javascript"></input>
+					</td>
+				</tr>
+			</table>
+		</span>
+	</div>
+</body>
+</html>
