@@ -112,10 +112,11 @@
 	function sendForm ( justForStyle ) 
 	{
 		if ( methodSelect.value == "post" )
-			postForm ( justForStyle ) 
-		else getForm ( justForStyle ) 
+			sendByPost ( justForStyle ) 
+		else sendByGet ( justForStyle ) 
 	}
-	function postForm ( justForStyle ) 
+
+	function sendByPost ( justForStyle ) 
 	{
 		switch ( formatSelect.value )
 		{
@@ -130,7 +131,7 @@
 			case "application/x-www-form-urlencoded" :
 				fetch ( document.forms [ 0 ].action , 
 				{
-					method: "post" ,
+					method: methodSelect.value ,
 					headers: { "Content-Type": "application/x-www-form-urlencoded; charset=utf-8" } ,
 					body: getUriData () 
 				} ).then ( justForStyle ? readDataFromResponseJustForStyle : readDataFromResponse , sayNo ) ;
@@ -143,11 +144,9 @@
 					body: JSON.stringify ( getJsonData () )
 				} ).then ( justForStyle ? readDataFromResponseJustForStyle : readDataFromResponse , sayNo ) ;
 			break ;
-			default :
-				return ;
 		}
   	}
-	function getForm ( justForStyle ) 
+	function sendByGet ( justForStyle ) 
 	{
 		switch ( formatSelect.value )
 		{
@@ -167,11 +166,9 @@
 				fetch ( actionSelect.value + "?json=" + encodeURI ( JSON.stringify ( getJsonData () ) ) , 
 				{
 					method: "get" ,
-					headers: { "Content-Type": "application/json" } ,
+					headers: { "Content-Type": "application/json; charset=utf-8" } ,
 				} ).then ( justForStyle ? readDataFromResponseJustForStyle : readDataFromResponse , sayNo ) ;
 			break ;
-			default :
-				return ;
 		}
  	}
 	function readDataFromResponseJustForStyle ( response )
