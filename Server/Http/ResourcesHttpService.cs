@@ -35,6 +35,18 @@ namespace WebSockets
 				get => _resourcePaths ;
 			}
 			/// <summary>
+			/// Auxiliary variable for resourceNamePrefix property
+			/// </summary>
+			protected string _resourceNamePrefix  ;
+			/// <summary>
+			/// Prefix to remove from resource names(it can be null).
+			/// <br/>If prefix is not empty then only resource names with prefix will be enumerated and used.
+			/// </summary>
+			public string resourceNamePrefix
+			{
+				get => _resourceNamePrefix ;
+			}
+			/// <summary>
 			/// Auxiliary variable for resourceAssembly property
 			/// </summary>
 			protected Assembly _resourceAssembly ;
@@ -73,7 +85,7 @@ namespace WebSockets
 			/// Load assembly from valid(!) path and creates new ResourcesHttpServiceData instance
 			/// </summary>
 			/// <param name="path">Assembly location</param>
-			public ResourcesHttpServiceData ( string path ) : this ( WebServerConfigData.loadAssembly ( path ) )
+			public ResourcesHttpServiceData ( string path , string resourceNamePrefix ) : this ( WebServerConfigData.loadAssembly ( path ) , resourceNamePrefix )
 			{
 				if ( _resourceAssembly == null ) 
 					this [ "resourceAssemblySource" ] = _resourceAssemblySource = path ; //!!!!yessss
@@ -83,7 +95,7 @@ namespace WebSockets
 			/// <br/>It creates resource paths it self
 			/// </summary>
 			/// <param name="assembly">Valid, non null assembly</param>
-			public ResourcesHttpServiceData ( Assembly assembly ) : this ( assembly , null )
+			public ResourcesHttpServiceData ( Assembly assembly , string prefix ) : this ( assembly , prefix , null )
 			{
 			}
 			/// <summary>
@@ -91,12 +103,13 @@ namespace WebSockets
 			/// </summary>
 			/// <param name="assembly">Assembly with resources</param>
 			/// <param name="paths">Dictionary containing lowcase file names for keys and full resource names for values.</param>
-			public ResourcesHttpServiceData ( Assembly assembly , Dictionary <string,string> paths )
+			public ResourcesHttpServiceData ( Assembly assembly , string resourceNamePrefix , Dictionary <string,string> paths )
 			{
 				_resourceAssembly = assembly ;
 				_resourceAssemblySource = assembly == null ? "" : assembly.Location ;
 				this.Add ( "resourceAssemblySource" , new JValue ( assembly == null ? "" : assembly.Location ) ) ;
-				_resourcePaths = paths == null ?  assembly == null ? null : getAssemblyPaths ( assembly ) : paths ;
+				this.Add ( "resourceNamePrefix" , resourceNamePrefix ) ;
+				_resourcePaths = paths == null ?  assembly == null ? null : getAssemblyPaths ( assembly , resourceNamePrefix ) : paths ;
 			}
 			/// <summary>
 			/// Enumarate all resources in given assembly and creates dictionary containing lowcase file names for keys and full resource names for values
@@ -111,6 +124,29 @@ namespace WebSockets
 					try			//it maybe doubles
 					{
 						resourcePaths.Add ( name.ToLower().Substring ( prefixLength ) , name ) ;
+					}
+					catch { }
+				return resourcePaths ;
+			}
+			/// <summary>
+			/// Enumarate all resources in given assembly and creates dictionary containing lowcase file names for keys and full resource names for values
+			/// </summary>
+			/// <param name="assembly">Assembly with resources</param>
+			/// <returns>Dictionary containing lowcase file names for keys and full resource names for values.</returns>
+			public static Dictionary<string, string> getAssemblyPaths ( Assembly assembly , string prefix )
+			{
+				if ( string.IsNullOrWhiteSpace ( prefix ) ) return getAssemblyPaths ( assembly ) ;
+				
+				Dictionary<string,string> resourcePaths = new Dictionary<string,string>() ;
+				
+				int prefixLength = prefix.Length ;
+				prefix = prefix.ToLower () ;
+				
+				foreach ( string name in assembly.GetManifestResourceNames() )
+					try			//it maybe doubles
+					{
+						if ( string.Compare ( name.Substring ( 0 , prefixLength ) , prefix , StringComparison.OrdinalIgnoreCase ) == 0 )
+							resourcePaths.Add ( name.Substring ( prefixLength ).ToLower() , name ) ;
 					}
 					catch { }
 				return resourcePaths ;
@@ -132,6 +168,9 @@ namespace WebSockets
 					_resourcePaths = getAssemblyPaths ( _resourceAssembly ) ;
 				}
 				else throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"resourceAssemblySource\"" ) ;
+				token = obj [ "resourceNamePrefix" ] ;
+				if ( token.Type == JTokenType.String )
+					this [ "resourceNamePrefix " ] = _resourceNamePrefix = token.ToObject<string>() ;
 			}
 			///// <summary>
 			///// Saves TestHttpService.TestHttpServiceData object to json string
@@ -203,7 +242,7 @@ namespace WebSockets
 			codeError = null ;
 			try
 			{
-				string resourcePath = getSafePath ( "" , connection.request.uri.LocalPath ).Replace ( '\\' , '.' ) ; ;
+				string resourcePath = getSafePath ( "" , connection.request.uri.LocalPath ).Replace ( '\\' , '.' ) ; 
 				if ( ( resourcePath == "" ) || ( resourcePath == "." )  )
 					resourcePath  = "default.html" ; 
 				else if ( resourcePath  [ 0 ] == '.' )

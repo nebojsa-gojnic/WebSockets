@@ -69,15 +69,20 @@ namespace WebSockets
 		{
 		}
 		/// <summary>
-		/// Creates WebServerConfigData instance from give WebServer instance
+		/// Creates new WebServerConfigData instance.
 		/// </summary>
-		public WebServerConfigData ( int port , string siteName , string certificatePath , string certificatePassword , SslProtocols protocol , IDictionary <PathDefinition, HttpServiceActivator> serverPaths ):this ()
+		/// <param name="port">TCP port to listen on</param>
+		/// <param name="siteName">Name of the site to respont to</param>
+		/// <param name="certificatePath">Path to the certifiacte file, can be null</param>
+		/// <param name="certificatePassword">Passpowrd for the certifiacte file, can be null</param>
+		/// <param name="protocol">SSL protocol,Tls12 , Tls12 and Tls13 are acceptable values</param>
+		/// <param name="serverPaths">IDictionary &;tPathDefinition,HttpServiceActivator&gt; instance with  paths and service activators, may not be null nor empty</param>
+		public WebServerConfigData ( int port , string siteName , string certificatePath , string certificatePassword , SslProtocols protocol , IDictionary <PathDefinition,HttpServiceActivator> serverPaths ):this ()
 		{
 			// "port":443, "sitename":"myDomain" , "sslCertificate":"path_to_file" , "sslProtocol":"tls1.2",<br/>
 			// "services":[{},{}...{}]<br/>
 			// "paths":[{},{}...{}]<br/>
-			JArray services = new JArray () ;
-			JArray paths = new JArray () ;
+			
 			Add ( "port" , _port = port ) ;
 			if ( !string.IsNullOrWhiteSpace ( _sitename = siteName ) ) Add ( "sitename" , _sitename ) ;
 			if ( !string.IsNullOrWhiteSpace ( _sslCertificateSource = certificatePath ) )
@@ -86,9 +91,15 @@ namespace WebSockets
 				Add ( "sslCertificatePassword" , _sslCertificatePassword = string.IsNullOrWhiteSpace ( certificatePassword ) ? "" : certificatePassword ) ;
 				Add ( "sslProtocol" , ( _sslProtocol = protocol ).ToString () ) ;
 			}
-			Add ( "services" , services ) ;
-			Add ( "paths" , paths ) ;
-			foreach ( KeyValuePair<PathDefinition,HttpServiceActivator> pair in serverPaths  )
+			foreach ( KeyValuePair <PathDefinition,HttpServiceActivator> pair in serverPaths )
+				_paths.Add ( pair ) ;
+			loadPaths ( ) ;
+		}
+		protected virtual void loadPaths ( )
+		{
+			JArray paths = new JArray () ;
+			JArray services = new JArray () ;
+			foreach ( KeyValuePair<PathDefinition,HttpServiceActivator> pair in _paths )
 			{
 				if ( !_services.ContainsKey ( pair.Value.name ) )
 				{
@@ -104,8 +115,11 @@ namespace WebSockets
 				path.Add ( "path" , pair.Key.path ) ;
 				paths.Add ( path ) ;
 
-				_paths.Add ( pair ) ;
 			}
+			this [ "services" ] = services ;
+			this [ "paths" ] = paths ;
+
+			
 		}
 		/// <summary>
 		/// Auxiliary variable for the serviceDemandCount  property, number of services specified in json config file
@@ -327,7 +341,7 @@ namespace WebSockets
 
 
 		/// <summary>
-		/// Load services from coresponing json section
+		/// Load services from coresponding json section
 		/// </summary>
 		/// <param name="array">JSON array(JArray)<br/>
 		/// [<br/>
@@ -589,7 +603,7 @@ namespace WebSockets
 		/// "services":[{},{}...{}]<br/>
 		/// "paths":[{},{}...{}]<br/>
 		/// }</param>
-		/// <param name="certificate ">When this is null new instance of X509Certificate2 will be creared for the certificate property,<br/>
+		/// <param name="certificate ">When this is null new instance of X509Certificate2 will be created for the certificate property,<br/>
 		/// otherwise new value for the sslCertificate property will be created when it is called for the first time in coresponding get method.</param>
 		/// <exception cref="InvalidDataException"></exception>
 		public virtual void loadFromJSON ( JObject jObject , X509Certificate2 certificate )

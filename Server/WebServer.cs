@@ -168,7 +168,8 @@ namespace WebSockets
 				if ( configData.services.Count == 0 ) throw new ApplicationException ( "No services in configuration file" ) ;
 				_configData = configData ;
 				pathManager.Clear () ;
-				if ( configData.pathDemands.Count == 0 ) throw new ApplicationException ( "No paths in configuration file" ) ;
+				if ( configData.paths == null ) throw new ApplicationException ( "No paths in configuration file(null)" ) ;
+				if ( configData.paths.Count == 0 ) throw new ApplicationException ( "No paths in configuration file(0)" ) ;
 
 				foreach ( KeyValuePair<PathDefinition,HttpServiceActivator> pair in configData.paths )
 					pathManager.Add ( pair.Key , pair.Value ) ;

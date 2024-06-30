@@ -33,37 +33,17 @@ namespace SimpleHttp
 		/// <param name="certificatePath"></param>
 		/// <param name="certificatePassword"></param>
 		/// <param name="protocol"></param>
-		public FileWebConfigData ( string webroot , string siteName , int port , string certificatePath , string certificatePassword , SslProtocols protocol )
+		public FileWebConfigData ( string webroot , int port , string siteName , string certificatePath , string certificatePassword , SslProtocols protocol ) : 
+							base ( port , siteName , certificatePath , certificatePassword , protocol , getPaths ( webroot ) )
 		{
-			JObject obj = new JObject () ;
-			JArray services = new JArray () ;
-			JArray paths = new JArray () ;
-			_webroot = webroot ;
-			obj.Add ( "port" , _port = port ) ;
-			obj.Add ( "sitename" , _sitename = siteName ) ;
-			
-			if ( !string.IsNullOrWhiteSpace ( _sitename = siteName ) ) Add ( "sitename" , _sitename ) ;
-			if ( !string.IsNullOrWhiteSpace ( _sslCertificateSource = certificatePath  ) )
-			{
-				obj.Add ( "sslCertificate" , _sslCertificateSource ) ;
-				obj.Add ( "sslCertificatePassword" , string.IsNullOrWhiteSpace ( certificatePassword ) ? "" : certificatePassword ) ;
-				obj.Add ( "sslProtocol" , ( _sslProtocol = protocol ).ToString () ) ;
-			}
-			obj.Add ( "services" , services ) ;
-			obj.Add ( "paths" , paths ) ;
-			JObject service = new JObject () ;
-			service.Add ( "service" , "fileHttpService" ) ;
-			Type FileHttpServiceType = typeof ( FileHttpService ) ;
-			service.Add ( "source" , FileHttpServiceType.AssemblyQualifiedName ) ;
-			FileHttpService.FileHttpServiceData configData = new FileHttpService.FileHttpServiceData ( webroot ) ;
-			service.Add ( "configData" , configData ) ;
-			services.Add ( service ) ;
-
-			JObject path = new JObject () ;
-			path.Add ( "service" , "fileHttpService" ) ;
-			path.Add ( "path" , "/*" ) ;
-			paths.Add ( path ) ;
-			loadFromJSON ( obj ) ;
+			this [ "webroot" ] = _webroot = webroot ;
+			//this.paths.
+		}
+		public static IDictionary <PathDefinition,HttpServiceActivator> getPaths ( string webroot )
+		{
+			Dictionary <PathDefinition,HttpServiceActivator> ret = new Dictionary <PathDefinition,HttpServiceActivator> () ;
+			ret.Add ( new PathDefinition ( "/*" ) , new HttpServiceActivator ( "fileHttpService" , typeof ( FileHttpService ) , new FileHttpService.FileHttpServiceData ( webroot ) ) ) ;
+			return ret ;
 		}
 	}
 }

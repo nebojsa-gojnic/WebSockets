@@ -10,40 +10,56 @@ namespace SimpleHttp
 {
 	public class ResourceWebConfigData:WebServerConfigData
 	{
+		/// <summary>
+		/// Auxiliary variable for the assemblySource property
+		/// </summary>
 		protected string _assemblySource ;
+		/// <summary>
+		/// Auxiliary variable for the resourceNamePrefix property
+		/// </summary>
+		protected string _resourceNamePrefix ;
+		/// <summary>
+		/// Assembly source, path or nam
+		/// </summary>
 		public string assemblySource 
 		{
 			get => _assemblySource ;
 		}
-		public ResourceWebConfigData ( string assemblySource , string siteName , int port , string certificatePath , string certificatePassword , SslProtocols protocol )
+		/// <summary>
+		/// Prefix to remove from resourse names, can be null
+		/// </summary>
+		public string resourceNamePrefix 
+		{
+			get => _resourceNamePrefix ;
+		}
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="assemblySource"></param>
+		/// <param name="resourceNamePrefix"></param>
+		/// <param name="port"></param>
+		/// <param name="siteName"></param>
+		/// <param name="certificatePath"></param>
+		/// <param name="certificatePassword"></param>
+		/// <param name="protocol"></param>
+		public ResourceWebConfigData ( string assemblySource , string resourceNamePrefix , int port , string siteName , string certificatePath , string certificatePassword , SslProtocols protocol ) :
+						base ( port , siteName , certificatePath , certificatePassword , protocol , getPaths ( assemblySource , resourceNamePrefix ) )
 		{
 			_assemblySource = assemblySource ;
-			JObject obj = new JObject () ;
-			JArray services = new JArray () ;
-			JArray paths = new JArray () ;
-			obj.Add ( "port" , _port = port ) ;
-			obj.Add ( "sitename" , _sitename = siteName ) ;
-			
-			if ( !string.IsNullOrWhiteSpace ( _sitename = siteName ) ) Add ( "sitename" , _sitename ) ;
-			if ( !string.IsNullOrWhiteSpace ( _sslCertificateSource = certificatePath  ) )
-			{
-				obj.Add ( "sslCertificate" , _sslCertificateSource ) ;
-				obj.Add ( "sslCertificatePassword" , string.IsNullOrWhiteSpace ( certificatePassword ) ? "" : certificatePassword ) ;
-				obj.Add ( "sslProtocol" , ( _sslProtocol = protocol ).ToString () ) ;
-			}
-			obj.Add ( "services" , services ) ;
-			obj.Add ( "paths" , paths ) ;
-			JObject service = new JObject () ;
-			service.Add ( "service" , "resourceHttpService" ) ;
-			service.Add ( "source" ,  typeof ( ResourcesHttpService ).AssemblyQualifiedName ) ;
-			service.Add ( "configData" , new ResourcesHttpService.ResourcesHttpServiceData ( assemblySource ) ) ;
-			services.Add ( service ) ;
-			//_services.Add ( "resourceHttpService" , new HttpServiceActivator ( ResourcesHttpServiceType , configData ) ;	
-			JObject path = new JObject () ;
-			path.Add ( "service" , "resourceHttpService" ) ;
-			path.Add ( "path" , "/*" ) ;
-			paths.Add ( path ) ;
-			loadFromJSON ( obj ) ;
+			_resourceNamePrefix = resourceNamePrefix ;
+		}
+		/// <summary>
+		/// Creates new IDictionary &lt;PathDefinition,HttpServiceActivator&gt; instance with single path ( "/*" ) <br/>
+		/// pointing to HttpServiceActivator instance with all data nessesary for creation of the ResourceHttpService.
+		/// </summary>
+		/// <param name="assemblySource">Assembly source, path or name</param>
+		/// <param name="resourceNamePrefix">Prefix to remove from resourse names, can be null</param>
+		/// <returns></returns>
+		public static IDictionary <PathDefinition,HttpServiceActivator> getPaths ( string assemblySource , string resourceNamePrefix )
+		{
+			Dictionary <PathDefinition,HttpServiceActivator> ret = new Dictionary <PathDefinition,HttpServiceActivator> () ;
+			ret.Add ( new PathDefinition ( "/*" ) , new HttpServiceActivator ( "resourceHttpService" , typeof ( ResourcesHttpService ) , new ResourcesHttpService.ResourcesHttpServiceData ( assemblySource , resourceNamePrefix ) ) ) ;
+			return ret ;
 		}
 	}
 }
