@@ -170,9 +170,11 @@ namespace WebSockets
 				pathManager.Clear () ;
 				if ( configData.paths == null ) throw new ApplicationException ( "No paths in configuration file(null)" ) ;
 				if ( configData.paths.Count == 0 ) throw new ApplicationException ( "No paths in configuration file(0)" ) ;
-
 				foreach ( KeyValuePair<PathDefinition,HttpServiceActivator> pair in configData.paths )
+				{
 					pathManager.Add ( pair.Key , pair.Value ) ;
+					if ( !pair.Value.check ( this , out error ) ) throw error ;
+				}
 				if ( pathManager.Count == 0 ) throw new ApplicationException ( "No path matchs active service(s)" ) ;
 				this.sslCertificate = configData.sslCertificate ;
 				this.sslProtocol = configData.sslProtocol ;
@@ -252,7 +254,7 @@ namespace WebSockets
 						if ( service == null ) 
 						{
 							service = new BadRequestService () ;
-							service.init ( this , connectionDetails , null ) ;
+							service.init ( this , connectionDetails , new JObject () ) ;
 							_connectionErrorRaised?.Invoke ( this , new HttpConnectionDetails ( connectionDetails , 
 								createServiceException == null ?
 								new SerializationException ( "No path match \"" + connectionDetails.request.uri.LocalPath + "\"" ) :

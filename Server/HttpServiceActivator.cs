@@ -76,5 +76,20 @@ namespace WebSockets
 			service.init ( server , connection , configData ) ;
 			return service ;
 		}
+		/// <summary>
+		/// Creates new service for the given server and connection
+		/// </summary>
+		/// <param name="server">(WebServer)</param>
+		/// <param name="connection">(HttpConnectionDetails)</param>
+		/// <returns></returns>
+		public bool check ( WebServer server , out Exception exception  )
+		{
+			IHttpService service = ( IHttpService ) Activator.CreateInstance ( serviceType ) ;
+			bool ret = service.check ( server , configData ,  out exception ) ;
+			service.Dispose () ;
+			return ret ;
+
+		}
 	}
+
 }

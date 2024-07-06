@@ -56,6 +56,12 @@ namespace WebSockets
 		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
 		/// <param name="configData">Anything</param>
 		void init ( WebServer server , HttpConnectionDetails connection , JObject configData ) ;
-
+		
+		/// <summary>
+		/// checks
+		/// </summary>
+		/// <param name="server">WebServer instance</param>
+		/// <param name="configData">Anything</param>
+		bool check ( WebServer server , JObject configData , out Exception error) ;
     }
 }

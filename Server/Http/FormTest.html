@@ -216,6 +216,21 @@
 	{
 		document.forms [ 0 ].action = e.srcElement.value ;
 	}
+	
+	function formatSelect_Click ( e )
+	{
+		document.forms [ 0 ].enctype = e.srcElement.value ;
+	//	if ( e.srcElement.value == "get" )
+	//	{
+	//		sendButton.value = "Get via javascript" ;
+	//		submitButton.value = "Submit form(GET)" ;
+	//	}
+	//	else 
+	//	{
+	//		sendButton.value = "Post via javascript" ;
+	//		submitButton.value = "Submit form(POST)" ;
+	//	}
+	}
 	function methodSelect_Click ( e )
 	{
 		document.forms [ 0 ].method = e.srcElement.value ;
@@ -242,7 +257,12 @@
   	addEventListener ( "DOMContentLoaded" , ( event ) =>
 		{
 			actionSelect = document.getElementById ( "actionSelect" ) ;
+
 			formatSelect = document.getElementById ( "formatSelect" ) ;
+			formatSelect.addEventListener ( "click" , formatSelect_Click ) ;
+			formatSelect.addEventListener ( "blur" , formatSelect_Click ) ;
+
+
 			submitButton = document.getElementById ( "submitButton" ) ;
 			controlTable = document.getElementById ( "controlTable" ) ;
 			jsonTable = document.getElementById ( "jsonTable" ) ;
@@ -250,7 +270,6 @@
 			sendButton = document.getElementById ( "sendButton" ) ;
 			mainDiv = document.getElementById ( "mainDiv" ) ;
 			sendButton.addEventListener ( "click" , sendButton_Click ) ;
-			formatSelect = document.getElementById ( "formatSelect" ) ;
 
 	
 			const methodSelect = document.getElementById ( "methodSelect" ) ;
@@ -280,7 +299,7 @@
 					attributeFilter: [ "style" ]
 				} ) ;
 
-			postForm ( true ) ;
+			sendForm ( true ) ;
 	  	} ) ;
   // ...
 	</script>
@@ -428,6 +447,19 @@
 				</tr>
 			</table>
 		</span>
+		<form action="/debug" method="post" name="uploader" enctype="multipart/form-data">
+			<table>
+				<tr>
+					<td colpan="2"><input type="file" id="myFile" name="filename"></td>
+				</tr>
+				<tr>
+					<td>
+						<span>Action:</span>
+					</td>
+					<td><input type="submit"></td>
+				</tr>
+			</table>
+		</form>
 	</div>
 </body>
 </html>

@@ -34,6 +34,16 @@ namespace WebSockets
 										( "Method \"" + methodName + "\" not found" ) ) ;
 			return false ;
 		}
+		protected virtual string getMethodName ( Uri uri )
+		{
+			string methodName = uri.LocalPath ;
+			int i = methodName.IndexOf ( '/' , 1 ) ;
+			if ( i >= 0 ) 
+				methodName = i == methodName.Length - 1 ? "" : methodName.Substring ( i + 1 ) ;
+			i = methodName.IndexOf ( '?' ) ;
+			if ( i != -1 ) methodName = methodName.Substring ( 0 , i ) ;
+			return methodName.Length == 0 ? "" : methodName [ 0 ] == '/' ? methodName.Substring ( 1 ) : methodName ;
+		}
 		/// <summary>
 		/// This method should send data back to client
         /// </summary>
@@ -44,13 +54,8 @@ namespace WebSockets
 		/// <returns>Returns true if responded</returns>
 		public virtual bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out string methodName , out bool methodFound , out Exception error ) 
 		{
-			methodName = connection.request.uri.LocalPath ;
+			methodName = getMethodName ( connection.request.uri ) ;
 			methodFound = false ;
-			int i = methodName.LastIndexOf ('/') ;
-			if ( i >= 0 ) 
-				methodName = i == methodName.Length - 1 ? "" : methodName.Substring ( i + 1 ) ;
-			i = methodName.IndexOf ( '?' ) ;
-			if ( i != -1 ) methodName = methodName.Substring ( 0 , i ) ;
 			error = null ;
 			responseHeader = "HTTP/1.1 501 Not Implemented" ;
 			if ( methodName == "" )

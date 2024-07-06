@@ -13,98 +13,12 @@ using Newtonsoft.Json ;
 
 namespace WebSockets
 {
-    public class WebSocketService : WebSocketBase , IHttpService
+    public class WebSocketService : WebSocketBase  
     {
 		
-		/// <summary>
-		/// Auxiliary variable for the connection property
-		/// </summary>
-	    protected HttpConnectionDetails _connection ;
+
 		
-		/// <summary>
-		/// Connection data(HttpConnectionDetails)
-		/// </summary>
-		public virtual HttpConnectionDetails connection 
-		{
-			get => _connection ;
-		}
-
-	
-
-		/// <summary>
-		/// Auxiliary variable for the configData property
-		/// </summary>
-	    protected JObject _configData ;
-		/// <summary>
-		/// Anything
-		/// </summary>
-		public virtual JObject configData
-		{
-			get => _configData ;
-		}
-
-		/// <summary>
-		/// Auxiliary variable for the server property
-		/// </summary>
-	    protected WebServer _server ;
-		/// <summary>
-		/// WebServer instance this service belongs to.
-		/// </summary>
-		public virtual WebServer server
-		{
-			get => _server ;
-		}
-
-		/// <summary>
-		/// Init new instance 
-		/// </summary>
-		/// <param name="server">WebServer instance</param>
-		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
-		/// <param name="configData"> WebServerConfigData</param>
-		public virtual void init ( WebServer server , HttpConnectionDetails connection , JObject configData )
-		{
-			_server = server ;
-			//_webSocketConfigData = configData as WebSocketServiceData ;
-			//if ( _webSocketConfigData == null ) _webSocketConfigData = new WebSocketServiceData () ;
-			_configData = configData ;
-			
-			if ( configData != null )
-			{
-				JToken token = configData [ "noDelay" ] ;
-				if ( token == null )
-					throw new InvalidDataException ( "Key \"noDelay\" not found in JSON data" ) ;
-				switch ( token.Type )
-				{
-					case JTokenType.String :
-						switch ( token.ToObject<string>().ToLower() )
-						{
-							case "ni" :
-							case "ne" :
-							case "no" :
-							case "false" :
-							case "" :
-								connection.tcpClient.NoDelay = false ;
-							break ;
-							default :
-								connection.tcpClient.NoDelay = true ;
-							break ;
-						}
-					break ;
-					case JTokenType.Boolean :
-						connection.tcpClient.NoDelay = token.ToObject<bool>() ;
-					break ;
-					case JTokenType.Integer :
-						connection.tcpClient.NoDelay = token.ToObject<int>() != 0 ;
-					break ;
-					case JTokenType.Float :
-						connection.tcpClient.NoDelay = token.ToObject<double>() != 0 ;
-					break ;
-					default:
-						throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"noDelay\"" ) ;
-				}	
-			}
-		}
-        public virtual bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
+        public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
         {
 			responseHeader = "" ; 
 			codeError = null ;

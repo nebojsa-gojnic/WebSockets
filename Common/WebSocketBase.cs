@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
+using Newtonsoft.Json ;
+using Newtonsoft.Json.Linq ;
 using System.Security.Cryptography;
 using System.Text;
 using System.IO;
@@ -12,7 +14,7 @@ namespace WebSockets
 	/// <summary>
 	/// This is base class for both WebSockerClient and WebSockerService
 	/// </summary>
-    public abstract class WebSocketBase : IDisposable
+    public abstract class WebSocketBase : HttpServiceBase
     {
 
 		
@@ -288,24 +290,83 @@ namespace WebSockets
                 }
             }
         }
+		
 		/// <summary>
-		/// Axuiliary variable for the isDisposed property
+		/// This method should send data back to client
 		/// </summary>
-		protected bool _isDisposed ;
-		/// <summary>
-		/// This is true when object is disposed
-		/// </summary>
-		public bool isDisposed
+		/// <param name="responseHeader">Resonse header</param>
+		/// <param name="error">Code execution error(if any)</param>
+		/// <returns>Should returns true if response is 400 and everything OK</returns>
+		public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError ) 
 		{
-			get => isDisposed ;
+			responseHeader = "" ;
+			codeError = null ;
+			return false ;
+		}
+		// <summary>
+		/// Init new instance 
+		/// </summary>
+		/// <param name="server">WebServer instance</param>
+		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="configData"> WebServerConfigData</param>
+		public override void init ( WebServer server , HttpConnectionDetails connection , JObject configData )
+		{
+			base.init ( server , connection , configData ) ;
+			//_webSocketConfigData = configData as WebSocketServiceData ;
+			//if ( _webSocketConfigData == null ) _webSocketConfigData = new WebSocketServiceData () ;
 		}
 		/// <summary>
-		/// This method set isDisposed property value.
-		/// <br/>It should be called by new Dispose() method if overrided in order to set isDisposed property value.
+		/// Checks if all ok, it should be overridden in descendant class
 		/// </summary>
-        public virtual void Dispose()
-        {
-			_isDisposed = true ;
-        }
-    }
+		/// <param name="server">WebServer instance</param>
+		/// <param name="configData">(ResourcesHttpServiceData)</param>
+		public override bool check ( WebServer server , JObject configData , out Exception error )
+		{
+			if ( !base.check ( server , configData , out error ) ) return false ;
+			
+			if ( configData == null )
+				error = new ArgumentNullException ( "configData" ) ;
+			else 
+			{
+				JToken token = configData [ "noDelay" ] ;
+				if ( token == null )
+					throw new InvalidDataException ( "Key \"noDelay\" not found in JSON data" ) ;
+				switch ( token.Type )
+				{
+					case JTokenType.String :
+						switch ( token.ToObject<string>().ToLower() )
+						{
+							case "ni" :
+							case "ne" :
+							case "no" :
+							case "false" :
+							case "" :
+								connection.tcpClient.NoDelay = false ;
+							break ;
+							default :
+								connection.tcpClient.NoDelay = true ;
+							break ;
+						}
+					break ;
+					case JTokenType.Boolean :
+						connection.tcpClient.NoDelay = token.ToObject<bool>() ;
+					break ;
+					case JTokenType.Integer :
+						connection.tcpClient.NoDelay = token.ToObject<int>() != 0 ;
+					break ;
+					case JTokenType.Float :
+						connection.tcpClient.NoDelay = token.ToObject<double>() != 0 ;
+					break ;
+					default:
+						error = new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"noDelay\"" ) ;
+					break ;
+				}	
+			}
+			return error == null ;
+		}
+		public override Stream GetResourceStream ( Uri uri )
+		{
+			throw new NotImplementedException();
+		}
+	}
 }

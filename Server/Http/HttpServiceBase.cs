@@ -21,12 +21,27 @@ namespace WebSockets
             _configData = configData ;
             _connection = connection ;
 			_server = server ;
+			Exception exception ;
+			if ( ! check ( server , configData , out exception ) ) throw exception ;
+			if ( connection == null ) throw new ArgumentNullException ( "connection" ) ;
 			/*
 			//bool noDelay , 
             // send requests immediately if true (needed for small low latency packets but not a long stream). 
             // Basically, dont wait for the buffer to be full before before sending the packet
             tcpClient.NoDelay = noDelay ;
 			*/
+		}
+		/// <summary>
+		/// Checks if all ok, it should be overridden in descendant class
+		/// </summary>
+		/// <param name="server">WebServer instance</param>
+		/// <param name="configData">(ResourcesHttpServiceData)</param>
+		public virtual bool check ( WebServer server , JObject configData , out Exception error )
+		{
+			error = null ;
+			if ( server == null ) error = new ArgumentNullException ( "server" ) ;
+			if ( configData == null ) error = new ArgumentNullException ( "configData" ) ;
+			return error == null ;
 		}
 
 		/// <summary>

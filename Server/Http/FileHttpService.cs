@@ -52,7 +52,7 @@ namespace WebSockets
 			/// <summary>
 			/// Creates new instance of FileHttpServiceData class 
 			/// </summary>
-			/// <param name="webroot">Webroot folder </param>
+			/// <param name="jObject">(JObject)</param>
 			public FileHttpServiceData ( JObject obj )
 			{
 				loadFromJSON ( obj ) ;
@@ -60,14 +60,14 @@ namespace WebSockets
 			/// <summary>
 			/// Loads FileHttpService.FileHttpServiceData object with data from json string
 			/// </summary>
-			/// <param name="json">JSON string</param>
+			/// <param name="jObject">(JObject)</param>
 			public virtual void loadFromJSON ( JObject jObject ) 
 			{ 
 				JToken token = jObject [ "webroot" ] ;
 				if ( token == null )
 					throw new InvalidDataException ( "Key \"webroot\" not found in JSON data" ) ;
 				if ( token.Type == JTokenType.String )
-					_webroot = token.ToObject<string>() ;
+					this [ "webroot" ] = _webroot = token.ToObject<string>() ;
 				else throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"webroot\"" ) ;
 			}
 			///// <summary>
@@ -106,8 +106,20 @@ namespace WebSockets
 				_fileConfigData = configData as FileHttpServiceData ;
 				if ( _fileConfigData == null ) _fileConfigData = new FileHttpServiceData ( configData ) ;
 			}
-			base.init ( server , connection , configData ) ;
-
+			base.init ( server , connection , _fileConfigData ) ;
+		}
+		public override bool check ( WebServer server , JObject configData , out Exception error )
+		{
+			if ( !base.check ( server , configData , out error ) ) return false ;
+			string webroot = ( string ) configData [ "webroot" ] ;
+			if ( string.IsNullOrWhiteSpace ( webroot ) )
+			{
+				error = new ArgumentNullException ( "webroot" ) ;
+				return false ;
+			}
+			if ( Directory.Exists ( webroot ) ) return true ;
+			error = new ApplicationException ( "Invalid path for \"webroot\"\r\n" + webroot ) ;
+			return false ;
 		}
 		/// <summary>
 		/// Checks if given file path exists as folder

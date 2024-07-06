@@ -98,6 +98,20 @@ namespace WebSockets
 			public ResourcesHttpServiceData ( Assembly assembly , string prefix ) : this ( assembly , prefix , null )
 			{
 			}
+			public static string getAssemlyLocation ( Assembly assembly )
+			{
+				string location = "" ;
+				FileInfo fileInfo = new FileInfo ( assembly.Location ) ;
+				string currentDirectory = Directory.GetCurrentDirectory () ;
+				DirectoryInfo directoryInfo = new DirectoryInfo ( Directory.GetCurrentDirectory () ) ;
+				foreach ( FileInfo item in directoryInfo.EnumerateFiles ( fileInfo.Name ) )
+				{
+					location = item.FullName ;
+					break ;
+				}
+				Directory.SetCurrentDirectory ( currentDirectory ) ;
+				return location ;
+			}
 			/// <summary>
 			/// 
 			/// </summary>
@@ -106,8 +120,17 @@ namespace WebSockets
 			public ResourcesHttpServiceData ( Assembly assembly , string resourceNamePrefix , Dictionary <string,string> paths )
 			{
 				_resourceAssembly = assembly ;
-				_resourceAssemblySource = assembly == null ? "" : assembly.Location ;
-				this.Add ( "resourceAssemblySource" , new JValue ( assembly == null ? "" : assembly.Location ) ) ;
+				
+				if ( assembly == null )
+					_resourceAssemblySource = "" ;
+				else
+				{
+					_resourceAssemblySource = getAssemlyLocation ( assembly ) ;
+				}
+				
+				//_resourceAssemblySource = assembly == null ? "" : assembly.Location ; //assembly.Location is low case !?!
+
+				this.Add ( "resourceAssemblySource" , _resourceAssemblySource ) ;
 				this.Add ( "resourceNamePrefix" , resourceNamePrefix ) ;
 				_resourcePaths = paths == null ?  assembly == null ? null : getAssemblyPaths ( assembly , resourceNamePrefix ) : paths ;
 			}
@@ -165,12 +188,13 @@ namespace WebSockets
 				{
 					_resourceAssembly = Assembly.LoadFrom ( token.ToObject<string>() ) ;
 					this [ "resourceAssemblySource" ] = _resourceAssembly.Location ;
-					_resourcePaths = getAssemblyPaths ( _resourceAssembly ) ;
 				}
 				else throw new InvalidDataException ( "Invalid JSON value \"" + token.ToString() + "\" for \"resourceAssemblySource\"" ) ;
+				_resourceNamePrefix = null ;
 				token = obj [ "resourceNamePrefix" ] ;
 				if ( token.Type == JTokenType.String )
 					this [ "resourceNamePrefix " ] = _resourceNamePrefix = token.ToObject<string>() ;
+				_resourcePaths = getAssemblyPaths ( _resourceAssembly , _resourceNamePrefix ) ;
 			}
 			///// <summary>
 			///// Saves TestHttpService.TestHttpServiceData object to json string
@@ -216,18 +240,30 @@ namespace WebSockets
 		/// <param name="server">WebServer instance</param>
 		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
 		/// <param name="configData">(ResourcesHttpServiceData)</param>
-		public override void init ( WebServer server, HttpConnectionDetails connection , JObject configData )
+		public override void init ( WebServer server , HttpConnectionDetails connection , JObject configData )
 		{
+			base.init ( server , connection , configData ) ;
+		}
+		/// <summary>
+		/// Cehck
+		/// </summary>
+		/// <param name="server">WebServer instance</param>
+		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="configData">(ResourcesHttpServiceData)</param>
+		public override bool check ( WebServer server , JObject configData , out Exception exception )
+		{
+			if ( !base.check ( server , configData , out exception ) ) return false ;
 			//_resourcesConfigData = configData as ResourcesHttpServiceData ;
 			//if ( _resourcesConfigData == null ) _resourcesConfigData = new ResourcesHttpServiceData ( Assembly.GetEntryAssembly().Location ) ;
-			if ( configData == null )
-				_resourcesConfigData = new ResourcesHttpServiceData () ;
-			else 
-			{
-				_resourcesConfigData = configData as ResourcesHttpServiceData ;
-				if ( _resourcesConfigData == null ) _resourcesConfigData = new ResourcesHttpServiceData ( configData ) ;
-			}
-			base.init ( server , connection , _resourcesConfigData ) ;
+			//if ( configData == null ) 
+			//{
+			//	exception = new ApplicationException ( "No configuration data" ) ;
+			//	return false ;
+			//}
+			_resourcesConfigData = configData as ResourcesHttpServiceData ;
+			if ( _resourcesConfigData == null ) _resourcesConfigData = new ResourcesHttpServiceData ( configData ) ;
+			if ( _resourcesConfigData.resourcePaths == null ) exception = new ApplicationException  ( "No resource paths, possible invalid resource assembly name/path." ) ;
+			return exception == null ;
 		}
 		/// <summary>
 		/// This method sends file from 

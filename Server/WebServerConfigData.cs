@@ -118,8 +118,6 @@ namespace WebSockets
 			}
 			this [ "services" ] = services ;
 			this [ "paths" ] = paths ;
-
-			
 		}
 		/// <summary>
 		/// Auxiliary variable for the serviceDemandCount  property, number of services specified in json config file
@@ -408,6 +406,7 @@ namespace WebSockets
 		/// <returns>Returns Assemlby instance or null</returns>
 		public static Assembly loadAssembly ( string source )
 		{
+			if ( source == null ) return null ;
 			if ( File.Exists ( source ) )
 			{
 				source = new FileInfo( source ).FullName.ToLower() ;

@@ -13,9 +13,88 @@ namespace WebSockets
 	/// </summary>
 	public class DebugHttpService:CodeBaseHttpService
 	{
+		
+		/// <summary>
+		/// Config data for DebugHttpService class
+		/// </summary>
+		public class DebugHttpServiceData:JObject
+		{
+			/// <summary>
+			/// Auxiliary variable for the pathPrefix property
+			/// </summary>
+			protected string _pathPrefix ;
+			/// <summary>
+			/// If the pathPrefix exists(not null or empty) service responds only on paths that starts with given prefix and the prefix is removed from path for method name match.
+			/// </summary>
+			public string pathPrefix ;
+			/// <summary>
+			/// Creates new empty instance of DebugHttpServiceData class 
+			/// </summary>
+			public DebugHttpServiceData ( )
+			{
+				_pathPrefix = null ;
+			}
+			/// <summary>
+			/// Creates new instance of DebugHttpServiceData class 
+			/// </summary>
+			/// <param name="jObject">(JObject)</param>
+			public DebugHttpServiceData ( JObject obj )
+			{
+				loadFromJSON ( obj ) ;
+			}
+			/// <summary>
+			/// Loads DebugHttpService.DebugHttpServiceData object with data from json string
+			/// </summary>
+			/// <param name="jObject">(JObject)</param>
+			public virtual void loadFromJSON ( JObject jObject ) 
+			{ 
+				_pathPrefix = null ;
+				JToken token = jObject [ "pathPrefix" ] ;
+				if ( token != null )
+					if ( token.Type == JTokenType.String )
+						this [ "pathPrefix" ] = _pathPrefix = token.ToObject<string>() ;
+			}
+		}
+		protected override string getMethodName ( Uri uri )
+		{
+			string methodName = base.getMethodName ( uri ) ;
+			if ( string.IsNullOrWhiteSpace ( _debugConfigData.pathPrefix ) ) return methodName ;
+			if ( _debugConfigData.pathPrefix.Length > uri.LocalPath.Length ) return "" ;
+			if ( string.Compare ( _debugConfigData.pathPrefix , uri.LocalPath.Substring ( 0 , _debugConfigData.pathPrefix.Length ) , true ) == 0 ) 
+				return uri.LocalPath.Substring ( _debugConfigData.pathPrefix.Length ) ;
+			return "" ;
+		}
+		/// <summary>
+		/// Auxiliary variable for the fileConfigData 
+		/// </summary>
+		protected DebugHttpServiceData _debugConfigData ;
+		/// <summary>
+		/// Config data (webroot)
+		/// </summary>
+		public virtual DebugHttpServiceData debugConfigData
+		{
+			get => _debugConfigData;
+		}
+		/// <summary>
+		/// Init new instance 
+		/// </summary>
+		/// <param name="server">WebServer instance</param>
+		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="configData">(DebugHttpServiceData)</param>
+		public override void init ( WebServer server , HttpConnectionDetails connection , JObject configData )
+		{
+			if ( configData == null )
+				_debugConfigData = new DebugHttpServiceData () ;
+			else 
+			{
+				_debugConfigData = configData as DebugHttpServiceData ;
+				if ( _debugConfigData == null ) _debugConfigData = new DebugHttpServiceData ( configData ) ;
+			}
+			base.init ( server , connection , _debugConfigData ) ;
+		}
 		/// <summary>
 		/// This method should send data back to client
-        /// </summary>
+		/// </summary>
 		/// <param name="responseHeader">Resonse header</param>
 		/// <param name="methodName">Method name extracted from path</param>
 		/// <param name="methodFound">Return true if method with name equal to value in methodName is found</param>
@@ -27,7 +106,7 @@ namespace WebSockets
 				
 			if ( error == null )
 			{
-				if ( methodName == "FormTest.html" )
+				if ( methodName == "FormTest.html" ) 
 				{ 
 					Respond ( Assembly.GetExecutingAssembly().GetManifestResourceStream ( "WebSockets.Server.Http.FormTest.html" ) ) ;
 					return true ;
@@ -35,6 +114,12 @@ namespace WebSockets
 				else error = new ArgumentException ( methodFound ? 
 								( "Code method \"" + methodName + "\" does not responde to http " + connection.request.method + " method" ) :
 								( "Code method \"" + methodName + "\" not found" ) ) ;
+			}
+			else if ( methodName == "" ) 
+			{ 
+				error = null ;
+				Respond ( Assembly.GetExecutingAssembly().GetManifestResourceStream ( "WebSockets.Server.Http.FormTest.html" ) ) ;
+				return true ;
 			}
 			RespondeWithDebugHtml ( error , out responseHeader ) ;
 			return false ;
@@ -157,7 +242,7 @@ namespace WebSockets
 					text = text.Substring ( 1 ) ;
 			string [] queryParts = text.Split ( '&' ) ;
 			if ( text.Length > 0 )									//	queryParts.Length is never 0, checked
-				renderList ( "Query:" , queryParts ) ;
+				renderList ( "Query:" , getQueryParameters ( connection.request.uri.Query ) ) ;
 
 			renderList ( "Request header" , connection.request.header.headerText ) ;
 

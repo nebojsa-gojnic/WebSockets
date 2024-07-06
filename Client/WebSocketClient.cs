@@ -16,7 +16,7 @@ using System.Security.Authentication;
 
 namespace WebSockets
 {
-    public class WebSocketClient : WebSocketBase, IDisposable
+    public class WebSocketClient : WebSocketBase
     {
         private readonly bool _noDelay;
         private TcpClient _tcpClient;

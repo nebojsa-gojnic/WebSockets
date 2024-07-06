@@ -74,8 +74,8 @@ namespace WebSockets
 					int i = pair.IndexOf ( '=' ) ;
 					if ( ( i > 0 ) && ( i < pair.Length -1 ) ) //?????
 					{
-						string name = Uri.UnescapeDataString ( pair.Substring ( 0 , i ) ) ;
-						string value = Uri.UnescapeDataString ( pair.Substring ( i + 1 ) ) ;
+						string name = Uri.UnescapeDataString ( pair.Substring ( 0 , i ).Replace ( '+' , ' ' ) ) ; // ????
+						string value = Uri.UnescapeDataString ( pair.Substring ( i + 1 ).Replace ( '+' , ' ' ) ) ;
 						ret.Add ( name , value ) ;
 					}
 				}
