@@ -126,9 +126,9 @@ namespace WebSockets
 			Exception headerError = null ;
             try
             {
-				HttpHeaderData headerData = new HttpHeaderData ( stream ) ;
-				response = headerData.headerText ;
-				headerError = headerData.error ;
+				HttpRequest request = new HttpRequest ( connection ) ;
+				response = request.headerText ;
+				headerError = request.error ;
             }
             catch ( Exception x )
             {

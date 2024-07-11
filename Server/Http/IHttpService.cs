@@ -19,14 +19,25 @@ namespace WebSockets
 		bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception error ) ;
 
 		/// <summary>
-		/// This method should return (file) stream to resource specified by given uri
+		/// This method should return (file) stream to resource specified by the given uri<br/>
+		/// It is intended primarily for sending a file to an output stream (for http body part of html)<br/>
+		/// You don't have to make body this way, this is option for direct file transfer(no server text processing)
 		/// </summary>
-		/// <param name="uri">Target uri</param>
-		/// <returns>stream to resource specified by given uri</returns>
+		/// <param name="uri">Target resource uri</param>
+		/// <returns>stream to resource specified by the given target resource uri</returns>
 		Stream GetResourceStream ( Uri uri ) ;
 
-		
-
+		/// <summary>
+		/// This should write header and set isHeaderWriten flag
+		/// </summary>
+		/// <param name="headerText">Header text with first/status line
+		/// </param>
+		/// <returns>Returns true if succesfull</returns>
+		void WriteResponseHeader ( string headerText ) ;
+		/// <summary>
+		/// This should be set in WriteHeader() method
+		/// </summary>
+		bool isHeaderWriten { get ; } 
 		
 		/// <summary>
 		/// This should be set in Dispose() method

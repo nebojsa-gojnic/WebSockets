@@ -285,7 +285,6 @@ namespace WebSockets
 					resourcePath = resourcePath.Substring ( 1 ) ;
 					
 				resourcePath = resourcePath.ToLower() ;
-				System.Diagnostics.Debug.WriteLine ( "resourcePath: " + resourcePath ) ;
 				if ( _resourcesConfigData.resourcePaths.ContainsKey ( resourcePath.ToLower() ) )
 				{
 
@@ -299,7 +298,6 @@ namespace WebSockets
 						try
 						{
 							reourceStream = _resourcesConfigData.resourceAssembly.GetManifestResourceStream ( _resourcesConfigData.resourcePaths [ resourcePath ] ) ;
-							//System.Diagnostics.Debug.WriteLine (  "resource stream is null:" + ( reourceStream == null ).ToString () ) ;
 							int buffSize = 65536 ;
 							Byte [ ] buffer = new byte [ buffSize ] ;
 							responseHeader = connection.request.method.Trim().ToUpper() == "POST" ? RespondChunkedCreated ( contentTypeAndCharset  ) : RespondChunkedSuccess ( contentTypeAndCharset ) ;

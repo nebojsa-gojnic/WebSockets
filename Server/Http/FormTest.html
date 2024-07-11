@@ -1,4 +1,7 @@
-<html>
+﻿<html>
+	<head>
+		<link rel="icon" href="data:," />
+	</head>
 <body>
 	<script type="text/javascript">
   
@@ -39,8 +42,10 @@
 			}
 		}
 		// put form back
-		mainDiv.style.display = "inline-block" ;
+		mainDiv.style.visibility = "" ;
   		document.body.insertBefore ( mainDiv, document.body.firstChild ) ;
+		setSizes () ;
+		setMainDivMaxWidth () ;
     }
   	function sayNo ( e )
   	{
@@ -185,7 +190,7 @@
 		try
 		{
 			var jObject = JSON.parse ( jsonText.value ) ; //check syntax before sening
-			fetch ( "/debug/jsonTestMethod"  , 
+			fetch ( "<%debugPathPrefix>jsonTestMethod" ,
 			{
 				method: "post" ,
 				headers: { "Content-Type": "application/json; charset=utf-8" } ,
@@ -253,7 +258,19 @@
 	{
 		sendCustomJson ( ) ;
 	}		   
-	
+	function setSizes ( mutations , observer ) 
+	{
+		jsonTable.style.width = ( jsonText.offsetLeft - jsonTable.offsetLeft + jsonText.offsetWidth ).toString () + "px" ;
+		jsonText.parentElement.style.height = jsonText.offsetHeight.toString () + "px" ; 
+		var mainDivRect = mainDiv.getBoundingClientRect() ;
+		var jsonTableRect = jsonTable.getBoundingClientRect() ;
+		var jsonTextRect = jsonText.getBoundingClientRect() ;
+		mainDiv.style.minHeight = ( ( ( jsonTableRect.y - mainDivRect.y ) << 1 ) + jsonTextRect.y - jsonTableRect.y + jsonTextRect.x - jsonTableRect.x + jsonText.offsetHeight ).toString() + "px" ;
+	}
+	function setMainDivMaxWidth ( e ) 
+	{
+		jsonText.style.maxWidth = ( document.body.offsetWidth - ( (  jsonText.offsetLeft + jsonText.offsetParent.offsetLeft + jsonText.offsetParent.offsetParent.offsetLeft - document.body.offsetLeft ) << 1 ) ).toString() + "px" ;
+	}
   	addEventListener ( "DOMContentLoaded" , ( event ) =>
 		{
 			actionSelect = document.getElementById ( "actionSelect" ) ;
@@ -269,6 +286,7 @@
 			jsonText = document.getElementById ( "jsonText" ) ;
 			sendButton = document.getElementById ( "sendButton" ) ;
 			mainDiv = document.getElementById ( "mainDiv" ) ;
+
 			sendButton.addEventListener ( "click" , sendButton_Click ) ;
 
 	
@@ -284,27 +302,23 @@
 			document.getElementById ( "sendJSONButton" ).addEventListener ( "click" , sendJSONButton_Click ) ;
 
 
-			//var mutationObserver = window.MutationObserver || window.WebKitMutationObserver ;
-			var observer = new MutationObserver ( function ( mutations , observer ) 
-			{
-				jsonTable.style.width = ( jsonText.offsetLeft - jsonTable.offsetLeft + jsonText.offsetWidth ).toString () + "px" ;
-				jsonText.parentElement.style.height = jsonText.offsetHeight.toString () + "px" ; 
-			} ) ;
+			
 
-			observer.observe ( jsonText , 
+			//var mutationObserver = window.MutationObserver || window.WebKitMutationObserver ;
+			 new MutationObserver ( setSizes ).observe ( jsonText , 
 				{
 					jsonText: true ,
 					childList: false ,
 					attributes: true ,
 					attributeFilter: [ "style" ]
 				} ) ;
-
+			window.addEventListener ( "resize" , setMainDivMaxWidth ) ;
 			sendForm ( true ) ;
 	  	} ) ;
   // ...
 	</script>
-	<span id="mainDiv" style="display: none;">
-		<table id="jsonTable" style="">
+	<span id="mainDiv" style="visibility: hidden;">
+		<table id="jsonTable">
 			<tr>
 				<td style="text-align:left"><span>Custom JSON:</span></td>
 				<td style="text-align:right"><input type="button" id="sendJSONButton" value="Send JSON"></input></td>
@@ -355,7 +369,7 @@
 			</tr>
 		</table>
 		<span style="display:inline-block">
-			<form action="/debug" id="form1" name="formName1" method="post" style="">
+			<form action="<%debugPathPrefix>" id="form2" name="formName2" method="post" style="">
 				<table>
 					<tr>
 						<td>
@@ -391,7 +405,7 @@
 							<span>Text:</span>
 						</td>
 						<td>
-							<textarea autofocus id="textarea1" name="textarea1">1��</textarea>
+							<textarea autofocus id="textarea1" name="textarea1">1šðš</textarea>
 						</td>
 					</tr>
 					<tr>
@@ -433,8 +447,8 @@
 					</td>
 					<td>
 						<select id="actionSelect">
-							<option value="/debug" selected>debug</option>
-							<option value="/debug/parameterTestMethod">form test</option>
+							<option value="<%debugPathPrefix> " selected>debug</option>
+							<option value="<%debugPathPrefix>parameterTestMethod">form test</option>
 						</select>
 					</td>
 				</tr>
@@ -446,20 +460,22 @@
 					</td>
 				</tr>
 			</table>
+			<br/>
+			<form action="<%debugPathPrefix>" id="upl1" method="post" name="uploader" enctype="multipart/form-data">
+				<table>
+					<tr>
+						<td colpan="2"><input type="file" id="myFile" name="filename"></td>
+					</tr>
+					<tr>
+						<td>
+							<span>Action:</span>
+						</td>
+						<td><input type="submit"></td>
+					</tr>
+				</table>
+			</form>
 		</span>
-		<form action="/debug" method="post" name="uploader" enctype="multipart/form-data">
-			<table>
-				<tr>
-					<td colpan="2"><input type="file" id="myFile" name="filename"></td>
-				</tr>
-				<tr>
-					<td>
-						<span>Action:</span>
-					</td>
-					<td><input type="submit"></td>
-				</tr>
-			</table>
-		</form>
+		
 	</div>
 </body>
 </html>

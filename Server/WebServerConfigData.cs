@@ -99,6 +99,7 @@ namespace WebSockets
 		{
 			JArray paths = new JArray () ;
 			JArray services = new JArray () ;
+			_serviceDemandCount = 0 ;
 			foreach ( KeyValuePair<PathDefinition,HttpServiceActivator> pair in _paths )
 			{
 				if ( !_services.ContainsKey ( pair.Value.name ) )
@@ -108,6 +109,7 @@ namespace WebSockets
 					service.Add ( "source" , pair.Value.serviceType.AssemblyQualifiedName ) ;
 					service.Add ( "configData" , pair.Value.configData ) ;
 					services.Add ( service ) ;
+					_serviceDemandCount++ ;
 					_services.Add ( pair.Value.name , pair.Value ) ;	//	AI did it!
 				}
 				JObject path = new JObject () ;
@@ -607,9 +609,9 @@ namespace WebSockets
 		/// <exception cref="InvalidDataException"></exception>
 		public virtual void loadFromJSON ( JObject jObject , X509Certificate2 certificate )
 		{
-			//JObject obj = JsonConvert.DeserializeObject ( json ) as JObject ;
+			//JObject obj = JsonConvert.DeserializeObject ( json ) as JObject ;InvalidDataException 
 			if ( jObject == null ) throw new InvalidDataException ( "Invalid JSON type, object expected" ) ;
-			if ( jObject.First == null ) throw new InvalidDataException ( "Empty JSON" ) ;
+			if ( jObject.First == null ) throw new EmptyJSONException ( ) ;
 			if ( jObject != this )
 			{
 				

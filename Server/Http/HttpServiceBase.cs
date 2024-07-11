@@ -56,6 +56,21 @@ namespace WebSockets
 		{
 			get => _connection ;
 		}
+		/// <summary>
+		/// Returns last part of the uri local path without query string
+		/// </summary>
+		/// <param name="uri">Uri</param>
+		/// <returns>Returns last part of the uri local path without query string</returns>
+		protected virtual string getMethodName ( Uri uri )
+		{
+			string methodName = uri.LocalPath ;
+			int i = methodName.LastIndexOf ( '/' , 1 ) ;
+			if ( i >= 0 ) 
+				methodName = i == methodName.Length - 1 ? "" : methodName.Substring ( i + 1 ) ;
+			i = methodName.IndexOf ( '?' ) ;
+			if ( i != -1 ) methodName = methodName.Substring ( 0 , i ) ;
+			return methodName.Length == 0 ? "" : methodName [ 0 ] == '/' ? methodName.Substring ( 1 ) : methodName ;
+		}
 
 	
 
@@ -112,6 +127,46 @@ namespace WebSockets
 		/// <param name="error">Code execution error(if any)</param>
 		/// <returns>Should returns true if response is 400 and everything OK</returns>
 		public abstract bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError ) ;
+
+		/// <summary>
+		/// This should write header and set isHeaderWriten flag
+		/// </summary>
+		/// <param name="headerText">Header text<br/>
+		/// Additional, ending "\r\n" should be writen by this method.
+		/// </param>
+		/// <param name="error">Error if any</param>
+		/// <returns>Returns true if succesfull</returns>
+		public virtual void WriteResponseHeader ( string headerText ) 
+		{
+			if ( string.IsNullOrWhiteSpace ( headerText ) )  throw new InvalidDataException ( "Empty response header text" ) ;
+			headerText = headerText.Trim () ;
+			int headerTextLength = headerText.Length ;
+			if ( headerTextLength < 5 )  throw new InvalidDataException ( string.Concat ( "Invalid response header text(\"" , headerText , "\")" ) ) ;
+			if ( headerText.Substring ( headerTextLength - 4 ) != "\r\n\r\n" )
+			{
+				if ( headerText.Substring ( headerTextLength - 3 ) == "\r\n\r" )
+					headerText += '\n' ;
+				else if ( headerText.Substring ( headerTextLength - 2 ) == "\r\n" )
+					headerText += "\r\n" ;
+				else if ( headerText.Substring ( headerTextLength - 2 ) == "\n\r" )
+					headerText += "\n\r\n" ;											//is this going to help?
+				else if ( headerText.Substring ( headerTextLength - 2 ) == "\r" )
+					headerText += "\n\r\n" ;											
+				else headerText += "\r\n\r\n" ;											
+			}
+			WriteASCITextToStream ( headerText , connection.stream ) ;
+		}
+		/// <summary>
+		/// Axuiliary variable for the isHeaderWriten property
+		/// </summary>
+		protected bool _isHeaderWriten ;
+		/// <summary>
+		/// Returns true if http header already writen
+		/// </summary>
+		public virtual bool isHeaderWriten 
+		{ 
+			get ; 
+		} 
 		/// <summary>
 		/// Axuiliary variable for the isDisposed property
 		/// </summary>
@@ -119,7 +174,7 @@ namespace WebSockets
 		/// <summary>
 		/// This is true when object is disposed
 		/// </summary>
-		public bool isDisposed
+		public virtual bool isDisposed
 		{
 			get => isDisposed ;
 		}
@@ -139,18 +194,23 @@ namespace WebSockets
 		public abstract Stream GetResourceStream ( Uri uri ) ;
 		
 		/// <summary>
-		/// This method writes given header for unsuccessful request(s) into response stream and logs error(logger present)
+		/// This method writes given header for unsuccessful request(s) into response stream 
 		/// </summary>
-		/// <param name="header">Header to write</param>
-		/// <param name="errorMessage">Additionl error message for logging</param>
-		/// <returns></returns>
-		public virtual string RespondFailure ( string header , string errorMessage )
+		/// <param name="firstLine">First/status line, no "\r\n" at the end</param>
+		/// <param name="userErrorMessage">text message for the http body(utf-8)</param>
+		/// <returns>Full response header text</returns>
+		public virtual string RespondFailure ( string firstLine , string userErrorMessage )
 		{
-            Byte[] bytes = Encoding.ASCII.GetBytes ( header ) ;
+            byte [] bytes  = Encoding.UTF8.GetBytes ( userErrorMessage ) ;
+			stringBuilder.Clear () ;
+			stringBuilder.Append ( firstLine ) ;
+			stringBuilder.Append ( "\r\nContent-Type:text/html; charset=UTF-8\r\n;content-length:" ) ;
+			stringBuilder.Append ( bytes.Length.ToString () ) ;
+			stringBuilder.Append ( "\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n" ) ;
+			string headerText = stringBuilder.ToString () ;
+			WriteResponseHeader ( headerText ) ;
 			connection.stream.Write ( bytes , 0 , bytes.Length ) ;
-			bytes = Encoding.ASCII.GetBytes ( "\r\n\r\n" ) ;
-			connection.stream.Write ( bytes , 0 , bytes.Length ) ;
-			return header  ;
+			return headerText ;
 		}
 		/// <summary>
 		/// This method writes response header ("HTTP/1.1 404 Not Found") into response stream. 
@@ -159,7 +219,7 @@ namespace WebSockets
 		/// <returns>Returns entire header</returns>
         public virtual string RespondMimeTypeFailure ( string fileName )
         {
-			return RespondFailure ( "HTTP/1.1 415 Unsupported Media Type" , "File extension not supported: " + fileName ) ;
+			return RespondFailure ( "HTTP/1.1 415 Unsupported Media Type" , string.Concat ( "Unsupported media type: \"" , fileName , "\"" ) ) ;
         }
 
 		/// <summary>
@@ -169,7 +229,7 @@ namespace WebSockets
 		/// <returns>Returns entire header</returns>
         public virtual string RespondNotFoundFailure ( string fileName )
         {
-			return RespondFailure ( "HTTP/1.1 404 Not Found" , "File not found : " + fileName ) ;
+			return RespondFailure ( "HTTP/1.1 404 Not Found" , string.Concat ( "File not found :  \"" , fileName , "\"" ) ) ;
         }
 		/// <summary>
 		/// Write single chunk into response stream
@@ -212,9 +272,19 @@ namespace WebSockets
 		/// </summary>
 		/// <param name="contentType">Value of "Content-Type" header attribute</param>
 		/// <returns>Returns entire header</returns>
-		public virtual string RespondChunkedSuccess ( MimeTypeAndCharset mimeTypeAndCharset )
+		public virtual string RespondChunkedSuccess ( MimeTypeAndCharset mimeTypeAndCharset , bool noCache )
         {
 			return RespondChunkedSuccess ( mimeTypeAndCharset.mimeType , mimeTypeAndCharset.charset ) ;
+        }
+		/// <summary>
+		/// This method writes response header ("HTTP/1.1 200 OK") into response stream for chunked(!) mode.
+		/// <br/>It uses charset value supplied in constructor
+		/// </summary>
+		/// <param name="contentType">Value of "Content-Type" header attribute</param>
+		/// <returns>Returns entire header</returns>
+		public virtual string RespondChunkedSuccess ( MimeTypeAndCharset mimeTypeAndCharset )
+        {
+			return RespondChunkedSuccess ( mimeTypeAndCharset.mimeType , mimeTypeAndCharset.charset , false ) ;
         }
 		/// <summary>
 		/// This method writes response header ("HTTP/1.1 200 OK") into response stream for chunked(!) mode.
@@ -224,16 +294,25 @@ namespace WebSockets
 		/// <returns>Returns entire header</returns>
 		public virtual string RespondChunkedSuccess ( string contentType , string charset )
         {
+			return RespondChunkedSuccess ( contentType , charset , false ) ;
+		}
+		/// <summary>
+		/// This method writes response header ("HTTP/1.1 200 OK") into response stream for chunked(!) mode.
+		/// </summary>
+		/// <param name="contentType">Value of "Content-Type" header attribute</param>
+		/// <param name="charset">Value of "charset" (sub)attribute in "Content-Type" response header attribute</param>
+		/// <returns>Returns entire header</returns>
+		public virtual string RespondChunkedSuccess ( string contentType , string charset , bool noCache )
+        {
 			stringBuilder.Clear () ;
 			stringBuilder.Append ( "HTTP/1.1 200 OK\r\nContent-Type: " ) ;
 			stringBuilder.Append ( contentType ) ;
 			stringBuilder.Append ( "; charset=" ) ;
 			stringBuilder.Append ( charset ) ;
 			stringBuilder.Append ( "\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n" ) ;
-			string header = stringBuilder.ToString () ;
-            Byte[] bytes = Encoding.ASCII.GetBytes ( header ) ;
-            connection.stream.Write ( bytes , 0 , bytes.Length ) ;
-			return header ;
+			string headerText = stringBuilder.ToString () ;
+			WriteResponseHeader ( headerText ) ;
+			return headerText ;
         }
 
 		/// <summary>
@@ -273,14 +352,23 @@ namespace WebSockets
 				stringBuilder.Append ( "\r\nLocation: " ) ;
 				stringBuilder.Append ( location ) ;
 			}
-			stringBuilder.Append ( "\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n" ) ;
-			string header = stringBuilder.ToString () ;
-            Byte[] bytes = Encoding.ASCII.GetBytes ( header ) ;
-            connection.stream.Write ( bytes , 0 , bytes.Length ) ;
-			return header ;
+			stringBuilder.Append ( "\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive" ) ;
+			string headerText = stringBuilder.ToString () ;
+			WriteResponseHeader ( headerText ) ;
+			return headerText ;
+
         }
 
 
+		/// <summary>
+		/// This method writes response header ("HTTP/1.1 201 Created") into response stream for chunked(!) mode.
+		/// </summary>
+		/// <param name="contentType">Value of "Content-Type" header attribute</param>
+		/// <returns>Returns entire header</returns>
+		public virtual string RespondChunkedCreated ( MimeTypeAndCharset mimeTypeAndCharset , bool noCache )
+        {
+			return RespondChunkedCreated ( mimeTypeAndCharset.mimeType , mimeTypeAndCharset.charset , noCache ) ;
+        }
 
 		/// <summary>
 		/// This method writes response header ("HTTP/1.1 201 Created") into response stream for chunked(!) mode.
@@ -298,17 +386,28 @@ namespace WebSockets
 		/// <param name="charset">Value of "charset" (sub)attribute in "Content-Type" response header attribute</param>
 		/// <returns>Returns entire header</returns>
 		public virtual string RespondChunkedCreated ( string contentType , string charset )
+		{
+			return RespondChunkedCreated ( contentType , charset , false ) ;
+		}
+		/// <summary>
+		/// This method writes response header ("HTTP/1.1 201 Created") into response stream for chunked(!) mode.
+		/// </summary>
+		/// <param name="contentType">Value of "Content-Type" header attribute</param>
+		/// <param name="charset">Value of "charset" (sub)attribute in "Content-Type" response header attribute</param>
+		/// <returns>Returns entire header</returns>
+		public virtual string RespondChunkedCreated ( string contentType , string charset , bool noCache )
         {
 			stringBuilder.Clear () ;
 			stringBuilder.Append ( "HTTP/1.1 201 Created\r\nContent-Type: " ) ;
 			stringBuilder.Append ( contentType ) ;
 			stringBuilder.Append ( "; charset=" ) ;
 			stringBuilder.Append ( charset ) ;
+			if ( noCache ) stringBuilder.Append ( "\r\nCache-Control: no-cache" ) ;
 			stringBuilder.Append ( "\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n" ) ;
-			string header = stringBuilder.ToString () ;
-            Byte[] bytes = Encoding.ASCII.GetBytes ( header );
-            connection.stream.Write ( bytes , 0 , bytes.Length ) ;
-			return header ;
+			string headerText = stringBuilder.ToString () ;
+			WriteResponseHeader ( headerText ) ;
+			return headerText ;
+
         }
 		/// <summary>
 		/// This method writes response header ("HTTP/1.1 201 Created") into response stream for chunked(!) mode.
@@ -338,12 +437,22 @@ namespace WebSockets
 			stringBuilder.Append ( "\r\nContent-Length: " ) ;
 			stringBuilder.Append ( contentLength.ToString () ) ;
 			stringBuilder.Append ( "\r\nConnection: close\r\n\r\n" ) ;
-			string header = stringBuilder.ToString() ;
-			byte[] bytes = Encoding.ASCII.GetBytes ( header ) ;
-            connection.stream.Write ( bytes , 0 , bytes.Length ) ;
-			return header ;
-		}
+			string headerText = stringBuilder.ToString () ;
+			WriteResponseHeader ( headerText ) ;
+			return headerText ;
 
+		}
+		/// <summary>
+		/// This method writes response header ("HTTP/1.1 200 OK") into response stream for non-chunked response.
+		/// </summary>
+		/// <param name="contentType">Value of "Content-Type" header attribute</param>
+		/// <param name="contentLength">Value of "Content-Length" header attribute.<br/>
+		/// It should be equal to content size</param>
+		/// <returns>Returns entire header</returns>
+		public virtual string RespondSuccess ( MimeTypeAndCharset contentTypeAndCharset , long contentLength , bool noCache )
+        {
+            return RespondSuccess ( contentTypeAndCharset.mimeType , contentLength , contentTypeAndCharset.charset , noCache ) ;
+        }
 		/// <summary>
 		/// This method writes response header ("HTTP/1.1 200 OK") into response stream for non-chunked response.
 		/// </summary>
@@ -365,6 +474,18 @@ namespace WebSockets
 		/// <returns>Returns entire header</returns>
 		public virtual string RespondSuccess ( string contentType , long contentLength , string charset )
 		{
+			return RespondSuccess ( contentType , contentLength , charset , false ) ;
+		}
+		/// <summary>
+		/// This method writes response header ("HTTP/1.1 200 OK") into response stream for non-chunked response
+		/// </summary>
+		/// <param name="contentType">Value of "Content-Type" header attribute</param>
+		/// <param name="contentLength">Value of "Content-Length" header attribute.<br/>
+		/// It should be equal to content size</param>
+		/// <param name="charset">Value of "charset" (sub)attribute(in "Content-Type" header attribute)</param>
+		/// <returns>Returns entire header</returns>
+		public virtual string RespondSuccess ( string contentType , long contentLength , string charset , bool noCache )
+		{
 			stringBuilder.Clear () ;
 			stringBuilder.Append ( "HTTP/1.1 200 OK\r\nContent-Type: " ) ;
 			stringBuilder.Append ( contentType ) ;
@@ -372,11 +493,11 @@ namespace WebSockets
 			stringBuilder.Append ( charset ) ;
 			stringBuilder.Append ( "\r\nContent-Length: " ) ;
 			stringBuilder.Append ( contentLength.ToString () ) ;
+			if ( noCache ) stringBuilder.Append ( "\r\nCache-Control: no-cache" ) ;
 			stringBuilder.Append ( "\r\nConnection: close\r\n\r\n" ) ;
-			string header = stringBuilder.ToString() ;
-			byte[] bytes = Encoding.ASCII.GetBytes ( header ) ;
-            connection.stream.Write ( bytes , 0 , bytes.Length ) ;
-			return header ;
+			string headerText = stringBuilder.ToString () ;
+			WriteResponseHeader ( headerText ) ;
+			return headerText  ;
 		}
 		/// <summary>
         /// I am not convinced that this function is indeed safe from hacking file path tricks
@@ -423,11 +544,7 @@ namespace WebSockets
 
 			try
 			{ 
-				if ( resourceStream != null )
-				{
-					resourceStream.Close () ;
-					resourceStream.Dispose () ;
-				}
+				resourceStream?.Dispose () ;
 				reader?.Dispose () ;
 			}
 			catch { }
@@ -435,15 +552,16 @@ namespace WebSockets
 			return returnValue ;
 		}
 		/// <summary>
-		/// This method take given text, trims it, adds double end of line sequence and writes it into stream with ASCII decoding
+		/// 
 		/// </summary>
-		/// <param name="text">Header text</param>
+		/// <param name="text">ASCI text</param>
 		/// <param name="stream">Stream to write to</param>
-		public static void WriteHttpHeader ( string text , Stream stream )
+		public static void WriteASCITextToStream ( string text , Stream stream )
 		{
-			Byte[] bytes = Encoding.ASCII.GetBytes ( text.Trim() + "\r\n\r\n" ) ;
+			Byte[] bytes = Encoding.ASCII.GetBytes ( text ) ;
 			stream.Write ( bytes , 0 , bytes.Length ) ;
 		}
+		
 		
 
 	}

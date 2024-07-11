@@ -27,7 +27,7 @@ namespace WebSockets
 			internal set => setResponseHeader ( value ) ; 
 		}
 		public Exception error { get ; internal set ; }
-		public HttpRequestData request { get ; private set ; }
+		public HttpRequest request { get ; private set ; }
 		public SslProtocols sslProtocol { get ; internal set ; }
 		public X509Certificate2 sslCertificate { get ; internal set ; }
 		
@@ -57,7 +57,7 @@ namespace WebSockets
 		{
             this.stream = null ;
             this.tcpClient = null ;
-			if ( uri != null ) this.request = new HttpRequestData ( uri ) ;
+			if ( uri != null ) this.request = new HttpRequest ( uri ) ;
 			this.created = DateTime.Now ;
 			this.origin = null ;
 			this.responseHeader = "" ;
@@ -80,7 +80,7 @@ namespace WebSockets
 					this.stream = null ;
 					this.error = x ;
 				}
-				this.request = new HttpRequestData ( this ) ;
+				this.request = new HttpRequest ( this ) ;
 				this.tcpClient = tcpClient ;
 			
 				if ( this.error == null )

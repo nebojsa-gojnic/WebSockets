@@ -34,16 +34,6 @@ namespace WebSockets
 										( "Method \"" + methodName + "\" not found" ) ) ;
 			return false ;
 		}
-		protected virtual string getMethodName ( Uri uri )
-		{
-			string methodName = uri.LocalPath ;
-			int i = methodName.IndexOf ( '/' , 1 ) ;
-			if ( i >= 0 ) 
-				methodName = i == methodName.Length - 1 ? "" : methodName.Substring ( i + 1 ) ;
-			i = methodName.IndexOf ( '?' ) ;
-			if ( i != -1 ) methodName = methodName.Substring ( 0 , i ) ;
-			return methodName.Length == 0 ? "" : methodName [ 0 ] == '/' ? methodName.Substring ( 1 ) : methodName ;
-		}
 		/// <summary>
 		/// This method should send data back to client
         /// </summary>
@@ -67,11 +57,11 @@ namespace WebSockets
 				switch ( connection.request.method.Trim().ToUpper() )
 				{
 					case "GET" :
-						methodAttributeType  = typeof ( GetAttribute ) ;
+						methodAttributeType = typeof ( GetAttribute ) ;
 					break ;
 					case "POST" :
 						isPost = true ;
-						methodAttributeType  = typeof ( PostAttribute ) ;
+						methodAttributeType = typeof ( PostAttribute ) ;
 					break ;
 					default :
 						error = new ArgumentException ( "Invalid http method name \"" + connection.request.method + "\"" ) ;
@@ -82,15 +72,13 @@ namespace WebSockets
 					Type acceptRowJsonAttributeType = typeof ( AcceptRowJsonAttribute ) ;
 					Type parametersFromJsonAttributeType = typeof ( ParametersFromJsonAttribute ) ;
 					Type acceptPathAttributeType = typeof ( AcceptPathAttribute ) ;
-					foreach ( MethodInfo methodInfo in GetType().GetMethods ( ) )
+					foreach ( MethodInfo methodInfo in GetType().GetMethods ( BindingFlags.Public | BindingFlags.Instance ) )
 					{
 						AcceptPathAttribute acceptPathAttribute = methodInfo.GetCustomAttribute ( acceptPathAttributeType ) as AcceptPathAttribute; 
 						if ( acceptPathAttribute != null )
-						{
 							if ( acceptPathAttribute.MatchUri ( connection.request.uri.LocalPath ) )
 								methodName = methodInfo.Name ;		//	am I joker or what
-							else continue;						//	ohohoho
-						}
+							else continue ;							//	ohohoho
 
 						if ( methodInfo.Name == methodName ) 
 						{
@@ -101,8 +89,8 @@ namespace WebSockets
 								{
 									HttpFormParameterDictionary parameters ;
 									object [] data = new object [ 3 ] { null , parameters = ( isPost ? getQueryParameters ( connection ) : getQueryParameters ( connection.request.uri ) ) , ""  } ;
-									data [ 0 ] = connection.request.header.formType ; 
-									if ( connection.request.header.formType.ToLower() == "application/json" ) 
+									data [ 0 ] = connection.request.formType ; 
+									if ( connection.request.formType.ToLower() == "application/json" ) 
 									{
 										if ( methodInfo.GetCustomAttribute ( acceptRowJsonAttributeType ) != null ) 
 										{
@@ -142,10 +130,10 @@ namespace WebSockets
 			return false ;
 		}
 		/// <summary>
-		/// Send stream as body and with "text/html, UTF-8" header
+		/// Sends stream as body and with "text/html, UTF-8" header
 		/// </summary>
 		/// <param name="stream">File or resource</param>
-		protected void Respond  ( Stream stream )
+		protected virtual void Respond ( Stream stream )
 		{
 			try
 			{
@@ -167,6 +155,7 @@ namespace WebSockets
 			}
 			catch { }
 		}
+		
 		
 		/// <summary>
 		/// Extracts query parameters from  json.<br/>
@@ -209,23 +198,23 @@ namespace WebSockets
 		/// </returns>
 		public static HttpFormParameterDictionary getQueryParameters ( HttpConnectionDetails connection )
 		{
-			HttpHeaderData requestHeader = connection.request.header ;
-			if ( requestHeader.contentLength == -1 ) throw new ArgumentException ( "No \"Content-Length\" attribute in request heaer" ) ;
-			if ( requestHeader.contentLength == -2 ) throw new ArgumentException ( "Invalid value for the \"Content-Length\" attribute in request heaer" ) ;
-			if ( string.IsNullOrEmpty ( requestHeader.contentType ) ) throw new ArgumentException ( "No \"Content-Type\" attribute in request heaer" ) ;
-			if ( string.IsNullOrEmpty ( requestHeader.formType ) ) throw new ArgumentException ( "Invalid value for the \"Content-Type\" attribute in request heaer" ) ;
-			Encoding encoding = requestHeader.encodingText.ToLower() == "utf-8" ? Encoding.UTF8 : Encoding.ASCII ;
-			switch ( requestHeader.formType.ToLower() )
+			HttpRequest request = connection.request ;
+			if ( request.contentLength == -1 ) throw new ArgumentException ( "No \"Content-Length\" attribute in request heaer" ) ;
+			if ( request.contentLength == -2 ) throw new ArgumentException ( "Invalid value for the \"Content-Length\" attribute in request heaer" ) ;
+			if ( string.IsNullOrEmpty ( request.contentType ) ) throw new ArgumentException ( "No \"Content-Type\" attribute in request heaer" ) ;
+			if ( string.IsNullOrEmpty ( request.formType ) ) throw new ArgumentException ( "Invalid value for the \"Content-Type\" attribute in request heaer" ) ;
+			Encoding encoding = request.charset.ToLower() == "utf-8" ? Encoding.UTF8 : Encoding.ASCII ;
+			switch ( request.formType.ToLower() )
 			{
 				case "application/x-www-form-urlencoded" :
-					return getQueryParametersFromUrlEncodedForm ( connection.stream , requestHeader.contentLength , encoding ) ;
+					return getQueryParametersFromUrlEncodedForm ( connection.stream , request.contentLength , encoding ) ;
 				case "application/json" :
-					return getTextAsParameter ( "json" , getBodyAsText ( connection.stream , requestHeader.contentLength , encoding ) ) ;
+					return getTextAsParameter ( "json" , getBodyAsText ( connection.stream , request.contentLength , encoding ) ) ;
 				case "multipart/form-data" :
-					if ( string.IsNullOrEmpty ( requestHeader.formBoundary ) ) throw new ArgumentException ( "No value for the \"boundary\" subattribute of the \"Content-Length\" attribute in request heaer" ) ;
-					return getQueryParametersFromMultipartForm ( requestHeader.formBoundary , getBodyAsText ( connection.stream , requestHeader.contentLength , Encoding.UTF8 ) ) ;
+					if ( string.IsNullOrEmpty ( request.formBoundary ) ) throw new ArgumentException ( "No value for the \"boundary\" subattribute of the \"Content-Length\" attribute in request heaer" ) ;
+					return getQueryParametersFromMultipartForm ( request.formBoundary , getBodyAsText ( connection.stream , request.contentLength , Encoding.UTF8 ) ) ;
 			}
-			throw new ApplicationException ( "Invalid content type \"" + requestHeader.headerText + "\"" ) ;
+			throw new ApplicationException ( "Invalid content type \"" + request.headerText + "\"" ) ;
 		}
 		/// <summary>
 		/// Returns new HttpFormParameterDictionary(Dictionary&lt;string,object&gt;)instance with single parameter

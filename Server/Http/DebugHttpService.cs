@@ -26,13 +26,20 @@ namespace WebSockets
 			/// <summary>
 			/// If the pathPrefix exists(not null or empty) service responds only on paths that starts with given prefix and the prefix is removed from path for method name match.
 			/// </summary>
-			public string pathPrefix ;
+			public string pathPrefix { get => _pathPrefix ; } 
 			/// <summary>
-			/// Creates new empty instance of DebugHttpServiceData class 
+			/// Creates new empty instance of the DebugHttpServiceData class 
 			/// </summary>
 			public DebugHttpServiceData ( )
 			{
 				_pathPrefix = null ;
+			}
+			/// <summary>
+			/// Creates new instance of the DebugHttpServiceData class 
+			/// </summary>
+			public DebugHttpServiceData ( string pathPrefix )
+			{
+				this [ "pathPrefix" ] = _pathPrefix = pathPrefix ;
 			}
 			/// <summary>
 			/// Creates new instance of DebugHttpServiceData class 
@@ -57,12 +64,13 @@ namespace WebSockets
 		}
 		protected override string getMethodName ( Uri uri )
 		{
-			string methodName = base.getMethodName ( uri ) ;
-			if ( string.IsNullOrWhiteSpace ( _debugConfigData.pathPrefix ) ) return methodName ;
+			string methodName = uri.LocalPath ;
 			if ( _debugConfigData.pathPrefix.Length > uri.LocalPath.Length ) return "" ;
-			if ( string.Compare ( _debugConfigData.pathPrefix , uri.LocalPath.Substring ( 0 , _debugConfigData.pathPrefix.Length ) , true ) == 0 ) 
-				return uri.LocalPath.Substring ( _debugConfigData.pathPrefix.Length ) ;
-			return "" ;
+			if ( !string.IsNullOrWhiteSpace ( _debugConfigData.pathPrefix ) ) 
+				if ( string.Compare ( _debugConfigData.pathPrefix , methodName.Substring ( 0 , _debugConfigData.pathPrefix.Length ) , true ) == 0 ) 
+					methodName = methodName.Substring ( _debugConfigData.pathPrefix.Length ) ;
+				else return "" ;
+			return methodName.Length > 0 ? methodName [ 0 ] == '/' ?  methodName.Substring ( 1 ) : methodName : "" ;
 		}
 		/// <summary>
 		/// Auxiliary variable for the fileConfigData 
@@ -93,6 +101,47 @@ namespace WebSockets
 			base.init ( server , connection , _debugConfigData ) ;
 		}
 		/// <summary>
+		/// Converts stream to string, replace and send as body and with "text/html, UTF-8" header
+		/// </summary>
+		/// <param name="stream">File or resource</param>
+		protected virtual void RespondWithHtml ( Stream stream , bool noCache , out string responseHeader )
+		{
+			responseHeader = "" ;
+			TextReader reader = null ;
+			try
+			{
+				
+				reader = new StreamReader ( stream , Encoding.UTF8 , false , 16384 , true ) ;
+				stringBuilder.Clear () ;
+
+				// bad characteds should not be there
+				// but user can type anything in json so 
+				// we must do something about it
+				string replace = string.IsNullOrWhiteSpace ( _debugConfigData.pathPrefix ) ? "/" : _debugConfigData.pathPrefix.Replace ( "\"" , "&quot;" ).Replace ( "'" , "&apos" ) ;
+				try
+				{
+					while ( true )				// when you see this you know it is good !!!
+					{
+						stringBuilder.Append ( reader.ReadLine ().Replace ( "<%debugPathPrefix>" , replace ) ) ;
+						stringBuilder.Append ( '\r' ) ;
+						stringBuilder.Append ( '\n' ) ;
+					}
+				}
+				catch { }
+				byte [] bytes = Encoding.UTF8.GetBytes ( stringBuilder.ToString () ) ;
+				responseHeader = RespondSuccess ( new MimeTypeAndCharset ( "text/html" , "UTF-8" ) , bytes.Length , noCache ) ;
+				connection.stream.Write ( bytes , 0 , bytes.Length ) ;
+				//WriteFinalChunk () ;
+			}
+			catch { }
+			try
+			{ 
+				reader?.Dispose () ;
+			}
+			catch { }
+		}
+		
+		/// <summary>
 		/// This method should send data back to client
 		/// </summary>
 		/// <param name="responseHeader">Resonse header</param>
@@ -105,24 +154,32 @@ namespace WebSockets
 			if ( base.Respond ( mimeTypesByFolder , out responseHeader , out methodName , out methodFound , out error ) ) return true ;
 				
 			if ( error == null )
-			{
-				if ( methodName == "FormTest.html" ) 
-				{ 
-					Respond ( Assembly.GetExecutingAssembly().GetManifestResourceStream ( "WebSockets.Server.Http.FormTest.html" ) ) ;
-					return true ;
-				}
-				else error = new ArgumentException ( methodFound ? 
-								( "Code method \"" + methodName + "\" does not responde to http " + connection.request.method + " method" ) :
-								( "Code method \"" + methodName + "\" not found" ) ) ;
-			}
-			else if ( methodName == "" ) 
-			{ 
-				error = null ;
-				Respond ( Assembly.GetExecutingAssembly().GetManifestResourceStream ( "WebSockets.Server.Http.FormTest.html" ) ) ;
-				return true ;
-			}
+				error = new ArgumentException ( methodFound ? 
+						( "Code method \"" + methodName + "\" does not responde to http " + connection.request.method + " method" ) :
+						( "Code method \"" + methodName + "\" not found" ) ) ;
+			//{
+			//	switch ( methodName.ToLower () ) 
+			//	{ 
+			//		case "/formtest.html" :
+			//		case "formtest.html" :
+						
+			//			return true ;
+			//		default:
+			//			error = new ArgumentException ( methodFound ? 
+			//					( "Code method \"" + methodName + "\" does not responde to http " + connection.request.method + " method" ) :
+			//					( "Code method \"" + methodName + "\" not found" ) ) ;
+			//		break ;
+			//	}
+			//}
+			//else if ( methodName == "" ) 
+			//{ 
+			//	RespondeWithDebugHtml ( error , out responseHeader ) ;
+			//	//error = null ;
+			//	//RespondWithHtml ( Assembly.GetExecutingAssembly().GetManifestResourceStream ( "WebSockets.Server.Http.FormTest.html" ) ) ;
+			//	return true ;
+			//}
 			RespondeWithDebugHtml ( error , out responseHeader ) ;
-			return false ;
+			return true ;
 		}
 		/// <summary>
 		/// This method renders simple html page with list of given parameters
@@ -131,8 +188,8 @@ namespace WebSockets
 		[Get]
 		[Post]
 		[ParametersFromJson]
-		[AcceptPathAttribute("/Debug/parameterTestMethod")]
-		public void parameterTestMethod ( string formType , HttpFormParameterDictionary pars , out string responseHearder )
+		[AcceptPathAttribute("parameterTestMethod")]
+		public void parameterTestMethod ( string formType , HttpFormParameterDictionary pars , out string responseHeader )
 		{
 			stringBuilder.Clear () ;
 			renderHtmlAndBodyStartTag () ;
@@ -140,18 +197,27 @@ namespace WebSockets
 			renderList ( formType , pars ) ;
 			renderHtmlAndBodyEndTag () ;
 			byte [] buffer = Encoding.UTF8.GetBytes ( stringBuilder.ToString () ) ;
-			responseHearder = RespondCreated ( new MimeTypeAndCharset ( "text/html" , "UTF-8" ) , buffer.Length ) ;
+			responseHeader = RespondCreated ( new MimeTypeAndCharset ( "text/html" , "UTF-8" ) , buffer.Length ) ;
 
 			connection.stream.Write ( buffer , 0 , buffer.Length ) ;
 		}
+		[Get]
+		[Post]
+		[ParametersFromJson]
+		[AcceptPathAttribute("testPanel")]
+		public void testPanel  ( string formType , HttpFormParameterDictionary pars , out string responseHeader )
+		{
+			RespondWithHtml ( Assembly.GetExecutingAssembly().GetManifestResourceStream ( "WebSockets.Server.Http.FormTest.html" ) , true , out responseHeader ) ;
+		}
+		
 		/// <summary>
 		/// Renders given JObject into stringBuilder
 		/// </summary>
 		/// <param name="jObject">non-null JObject instance</param>
 		[Post]
 		[AcceptRowJson]
-		[AcceptPathAttribute("/Debug/jsonTestMethod")]
-		public void jsonTestMethod ( JObject jObject , out string responseHearder )
+		[AcceptPathAttribute("jsonTestMethod")]
+		public void jsonTestMethod ( JObject jObject , out string responseHeader )
 		{
 			//StringBuilder stringBuilder = new StringBuilder () ;
 			stringBuilder.Clear () ;
@@ -160,7 +226,7 @@ namespace WebSockets
 			renderJObject ( "json" , jObject ) ;
 			renderHtmlAndBodyEndTag () ;
 			byte [] buffer = Encoding.UTF8.GetBytes ( stringBuilder.ToString () ) ;
-			responseHearder = RespondCreated ( new MimeTypeAndCharset ( "text/html" , "UTF-8" ) , buffer.Length ) ;
+			responseHeader = RespondCreated ( new MimeTypeAndCharset ( "text/html" , "UTF-8" ) , buffer.Length ) ;
 
 			connection.stream.Write ( buffer , 0 , buffer.Length ) ;
 		}
@@ -185,7 +251,7 @@ namespace WebSockets
 			int buffSize = 65536 ;
 			MimeTypeAndCharset contentTypeAndCharset = new MimeTypeAndCharset ( "text/html" , "UTF-8" ) ;
 			responseHeader = connection.request.method.Trim().ToUpper() == "POST" ? 
-												RespondChunkedCreated ( contentTypeAndCharset ) : RespondChunkedSuccess ( contentTypeAndCharset ) ;
+												RespondChunkedCreated ( contentTypeAndCharset , true ) : RespondChunkedSuccess ( contentTypeAndCharset , true ) ;
 			int position = 0 ;
 			int length = buffer.Length - buffSize ;
 			while ( position < length )
@@ -196,7 +262,6 @@ namespace WebSockets
 			buffSize = buffer.Length - position ;
 			if ( buffSize > 0 ) WriteChunk ( buffer , position , buffSize ) ;
 			WriteFinalChunk () ;
-			connection.tcpClient.Client.Shutdown ( SocketShutdown.Send ) ;
 		}
 		/// <summary>
 		/// Returns entire html with message encoded in body as byte[] array
@@ -244,7 +309,7 @@ namespace WebSockets
 			if ( text.Length > 0 )									//	queryParts.Length is never 0, checked
 				renderList ( "Query:" , getQueryParameters ( connection.request.uri.Query ) ) ;
 
-			renderList ( "Request header" , connection.request.header.headerText ) ;
+			renderList ( "Request header" , connection.request.headerText ) ;
 
 
 			renderBodyAsString () ;
@@ -266,7 +331,7 @@ namespace WebSockets
 		/// </summary>
 		public virtual void renderHtmlAndBodyStartTag ()
 		{
-			stringBuilder.Append ( "<html>\r\n<body>\r\n" ) ;
+			stringBuilder.Append ( "<html>\r\n\t<head>\r\n\t\t<link rel=\"icon\" href=\"data:,\" />\r\n\t</head><body>\r\n" ) ;
 		}
 		/// <summary>
 		/// Renders "\r\n&lt;/body&gt;\r\n&lt;/html&gt;" ) into string builder
@@ -386,19 +451,29 @@ namespace WebSockets
 		/// </summary>
 		public virtual void renderBodyAsString ( )
 		{
-			Encoding encoding = connection.request.header.encodingText.ToLower() == "utf-8" ? Encoding.UTF8 : Encoding.ASCII ;
-			int contentLength = connection.request.header.contentLength ;
+			Encoding encoding = connection.request.charset.ToLower() == "utf-8" ? Encoding.UTF8 : Encoding.ASCII ;
+			int contentLength = connection.request.contentLength ;
 			string caption = "Body as string" ;
+			int bufferSize = 16384 ;
 			if ( contentLength > 0 )
 			{
-				if ( contentLength > 16384  )
+				int position = contentLength ;
+				if ( position > bufferSize )
 				{
-					caption = "Body as string(first 16384 of " + contentLength.ToString () + "bytes):" ;
-					contentLength = 16384 ;
+					caption = "Body as string(first 16384 of " + position.ToString () + "bytes):" ;
+					position = bufferSize ;
 				}
-				else caption = "Body as string(all " + contentLength.ToString () + "bytes):" ;
+				else caption = "Body as string(all " + position.ToString () + "bytes):" ;
 				
-				renderList ( caption , getBodyAsText ( connection.stream , contentLength , encoding ) ) ;  
+				renderList ( caption , getBodyAsText ( connection.stream , position , encoding ) ) ;  
+				byte [] buffer = new byte [ bufferSize ] ;
+				while ( position <= contentLength - bufferSize )
+				{
+					position+= bufferSize ;
+					connection.stream.Read ( buffer , 0 , bufferSize ) ;
+				}
+				if ( position < contentLength )
+					connection.stream.Read ( buffer , 0 , contentLength - position ) ;
 			}
 		}
 	}

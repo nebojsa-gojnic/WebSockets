@@ -20,17 +20,9 @@ namespace WebSockets
 		/// <returns>Always false</returns>
         public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
         {
-			responseHeader = "HTTP/1.1 400 Bad Request" ;
 			codeError = null ;
-			try
-			{
-				HttpServiceBase.WriteHttpHeader ( responseHeader , connection.stream ) ;
-			}
-			catch ( Exception x )
-			{
-				codeError = x ;
-			}
-			return false ;
+			responseHeader = RespondFailure ( "HTTP/1.1 400 Bad Request" , "" ) ;
+			return true ;
         }
 		/// <summary>
 		/// Returns null

@@ -35,7 +35,7 @@ namespace WebSockets
         }
         protected override void PerformHandshake ( Stream stream )
         {
-            string header = connection.request.header.headerText ;
+            string header = connection.request.headerText ;
 
             try
             {
@@ -52,30 +52,28 @@ namespace WebSockets
 
                 string secWebSocketKey = webSocketKeyRegex.Match(header).Groups[1].Value.Trim();
                 string setWebSocketAccept = base.ComputeSocketAcceptString(secWebSocketKey);
-                string response = ("HTTP/1.1 101 Switching Protocols\r\n"
-                                   + "Connection: Upgrade\r\n"
-                                   + "Upgrade: websocket\r\n"
-                                   + "Sec-WebSocket-Accept: " + setWebSocketAccept);
-
-                HttpServiceBase.WriteHttpHeader(response, stream);
+                string responseHeader = string.Concat ( "HTTP/1.1 101 Switching Protocols\r\n" ,
+													   "Connection: Upgrade\r\n" , 
+													   "Upgrade: websocket\r\n" ,
+													   "Sec-WebSocket-Accept: " , setWebSocketAccept ) ;
+				WriteResponseHeader ( responseHeader ) ;
             }
-            catch (WebSocketVersionNotSupportedException)
+            catch ( WebSocketVersionNotSupportedException )
             {
-                string response = "HTTP/1.1 426 Upgrade Required" + Environment.NewLine + "Sec-WebSocket-Version: 13";
-                HttpServiceBase.WriteHttpHeader(response, stream);
-                throw;
+                WriteResponseHeader ( "HTTP/1.1 426 Upgrade Required" + Environment.NewLine + "Sec-WebSocket-Version: 13" ) ;
+                throw ;
             }
-            catch (Exception)
+            catch ( Exception )
             {
-                HttpServiceBase.WriteHttpHeader("HTTP/1.1 400 Bad Request", stream);
+                WriteResponseHeader ( "HTTP/1.1 400 Bad Request" ) ;
                 throw;
             }
         }
 
-        private static void CloseConnection(Socket socket)
+        private static void CloseConnection ( Socket socket )
         {
-            socket.Shutdown(SocketShutdown.Both);
-            socket.Close();
+            socket.Shutdown ( SocketShutdown.Both ) ;
+            socket.Close() ;
         }
 
         public override void Dispose()
@@ -102,7 +100,7 @@ namespace WebSockets
 		/// </summary>
 		/// <param name="uri"></param>
 		/// <returns></returns>
-		public virtual Stream GetResourceStream ( Uri uri )
+		public override Stream GetResourceStream ( Uri uri )
 		{
 			return null ;
 		}

@@ -5,6 +5,15 @@
 	color: #444 ;
 	box-sizing: border-box ;
 }
+html
+{
+	overflow-x: hidden ;
+	overflow-y: auto ;
+}
+body
+{
+	margin: 0px ;
+}
 td
 {
 	vertical-align: baseline ;
@@ -87,6 +96,10 @@ table
 #mainDiv
 {
 	background-color: antiquewhite ; 
-	display: none ;  
+	display: block ;  
 	padding: 10px ;
+}
+#jsonTable
+{
+	float: left ;
 }

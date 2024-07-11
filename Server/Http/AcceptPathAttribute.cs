@@ -20,21 +20,10 @@ namespace WebSockets
 		}
 		public static bool PathMatchUri ( string path , string localUri )
 		{
-			int pathIndex = path.LastIndexOf ( "/" ) ;
-			if ( pathIndex == path.Length ) return false ;
-			
-			int localUriIndex = localUri.LastIndexOf ( "/" ) ;
-			if ( localUriIndex == localUri.Length ) return false ;
-
-			if ( pathIndex == -1 )
-				if ( localUriIndex == -1 )
-					return String.CompareOrdinal ( path , localUri ) == 0 ;
-				else return false ;
-			else if ( localUriIndex == -1 )
-				return false ;
-			
-			if ( string.Compare ( path.Substring ( 0 , pathIndex ) , localUri.Substring ( 0 , localUriIndex ) , true ) != 0 ) return false ;
-			return path.Substring ( pathIndex + 1 ) == localUri.Substring ( localUriIndex + 1 ) ;
+			if ( string.IsNullOrWhiteSpace ( path ) ) return false ;
+			//if ( path [ 0 ] != '/' ) path = '/' + path ;
+			if ( path.Length > localUri.Length ) return false ;
+			return string.Compare ( localUri.Substring ( localUri.Length - path.Length ) , path , true ) == 0 ;
 		}
 	}
 }
