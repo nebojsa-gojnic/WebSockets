@@ -14,9 +14,9 @@ namespace WebSockets
 		/// Init new instance 
 		/// </summary>
 		/// <param name="server">WebServer instance</param>
-		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="connection">Connection data(IncomingHttpConnection)</param>
 		/// <param name="configData">Anything</param>
-		public virtual void init ( WebServer server , HttpConnectionDetails connection , JObject configData ) 
+		public virtual void init ( WebServer server , IncomingHttpConnection connection , JObject configData ) 
 		{
             _configData = configData ;
             _connection = connection ;
@@ -47,12 +47,12 @@ namespace WebSockets
 		/// <summary>
 		/// Auxiliary variable for the connection property
 		/// </summary>
-	    protected HttpConnectionDetails _connection ;
+	    protected IncomingHttpConnection _connection ;
 		
 		/// <summary>
-		/// Connection data(HttpConnectionDetails)
+		/// Connection data(IncomingHttpConnection)
 		/// </summary>
-		public virtual HttpConnectionDetails connection 
+		public virtual IncomingHttpConnection connection 
 		{
 			get => _connection ;
 		}
@@ -126,7 +126,7 @@ namespace WebSockets
 		/// <param name="responseHeader">Resonse header</param>
 		/// <param name="error">Code execution error(if any)</param>
 		/// <returns>Should returns true if response is 400 and everything OK</returns>
-		public abstract bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError ) ;
+		public abstract bool Respond ( out string responseHeader , out Exception codeError ) ;
 
 		/// <summary>
 		/// This should write header and set isHeaderWriten flag
@@ -235,7 +235,7 @@ namespace WebSockets
 		/// Write single chunk into response stream
 		/// </summary>
 		/// <param name="buffer">Bytes to write</param>
-		/// <param name="length"></param>
+		/// <param name="length">Length to use</param>
 		public void WriteChunk ( byte [] buffer , int length )
 		{
 			byte [] header = Encoding.ASCII.GetBytes ( length.ToString ( "x" ) + "\r\n" ) ;
@@ -245,10 +245,10 @@ namespace WebSockets
 			connection.stream.WriteByte ( ( byte ) '\n' ) ;
 		}
 		/// <summary>
-		/// Write single chunk into response stream
+		/// Writes single chunk into response stream
 		/// </summary>
 		/// <param name="buffer">Bytes to write</param>
-		/// <param name="length"></param>
+		/// <param name="length">Length to use</param>
 		public void WriteChunk ( byte [] buffer , int position , int length )
 		{
 			byte [] header = Encoding.ASCII.GetBytes ( length.ToString ( "x" ) + "\r\n" ) ;
@@ -258,7 +258,7 @@ namespace WebSockets
 			connection.stream.WriteByte ( ( byte ) '\n' ) ;
 		}
 		/// <summary>
-		/// Write final(empty) chunk into response stream
+		/// Writes final(empty) chunk into response stream
 		/// </summary>
 		public void WriteFinalChunk (  )
 		{
@@ -285,12 +285,12 @@ namespace WebSockets
 		public virtual string RespondChunkedSuccess ( MimeTypeAndCharset mimeTypeAndCharset )
         {
 			return RespondChunkedSuccess ( mimeTypeAndCharset.mimeType , mimeTypeAndCharset.charset , false ) ;
-        }
+		}
 		/// <summary>
 		/// This method writes response header ("HTTP/1.1 200 OK") into response stream for chunked(!) mode.
 		/// </summary>
 		/// <param name="contentType">Value of "Content-Type" header attribute</param>
-		/// <param name="charset">Value of "charset" (sub)attribute in "Content-Type" response header attribute</param>
+		/// <param name = "charset" > Value of "charset" (sub) attribute in "Content-Type" response header attribute</param>
 		/// <returns>Returns entire header</returns>
 		public virtual string RespondChunkedSuccess ( string contentType , string charset )
         {
@@ -507,16 +507,27 @@ namespace WebSockets
         /// <returns>The file system path</returns>
         public string getSafePath ( string webroot , string path )
         {
-			try
+			if ( path.Length > 0 )
 			{
-				path = Uri.UnescapeDataString ( path ) ;
+				try
+				{
+					path = Uri.UnescapeDataString ( path ) ;
+				}
+				catch { }
+				path = path.Trim().Replace ( '/' , '\\' ) .Replace ( "%20" , " " ) ; //   System.Web.HttpUtility.UrlDecode ( path ) ;
+				if ( path [ 0 ] == '\\' )
+				{
+					if ( path.Length == 1 ) return webroot ;
+					if ( path [ 1 ] == '\\' )
+					{
+						if ( path.Length == 2 ) return webroot ;
+						return Path.Combine  ( webroot , path.Substring ( 2 ) ) ;
+					}
+					return Path.Combine  ( webroot , path.Substring ( 1 ) ) ;
+				}
+	            return Path.Combine  ( webroot , path ) ;
 			}
-			catch { }
-			path = path.Trim().Replace ( '/' , '\\' ) ;
-            if ( path.Contains ( ".." ) || ( path.IndexOf ( '\\' ) != 0 ) || ( path.IndexOf ( ':' ) != -1 ) )
-                return string.Empty ;
-			else path = path.Replace ( "%20" , " " ) ; //   System.Web.HttpUtility.UrlDecode ( path ) ;
-            return webroot + path ;
+			else return webroot ;
         }
 		/// <summary>
 		/// This method opens manifest resource stream defined by given name (resourceName),<br/>

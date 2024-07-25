@@ -238,9 +238,9 @@ namespace WebSockets
 		/// Init new instance 
 		/// </summary>
 		/// <param name="server">WebServer instance</param>
-		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="connection">Connection data(IncomingHttpConnection)</param>
 		/// <param name="configData">(ResourcesHttpServiceData)</param>
-		public override void init ( WebServer server , HttpConnectionDetails connection , JObject configData )
+		public override void init ( WebServer server , IncomingHttpConnection connection , JObject configData )
 		{
 			base.init ( server , connection , configData ) ;
 		}
@@ -248,7 +248,7 @@ namespace WebSockets
 		/// Cehck
 		/// </summary>
 		/// <param name="server">WebServer instance</param>
-		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="connection">Connection data(IncomingHttpConnection)</param>
 		/// <param name="configData">(ResourcesHttpServiceData)</param>
 		public override bool check ( WebServer server , JObject configData , out Exception exception )
 		{
@@ -272,7 +272,7 @@ namespace WebSockets
 		/// <param name="responseHeader">Resonse header</param>
 		/// <param name="error">Code execution error(if any)</param>
 		/// <returns>Should returns true if response is 400 and everything OK</returns>
-        public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
+        public override bool Respond ( out string responseHeader , out Exception codeError )
         {
 			responseHeader = "" ;
 			codeError = null ;
@@ -292,7 +292,8 @@ namespace WebSockets
 					string ext = "" ;
 					int i = resourcePath.LastIndexOf ( '.' ) + 1 ;
 					if ( ( i != 0 ) && ( i < resourcePath.Length ) ) ext = resourcePath.Substring ( i ) ;
-					if ( mimeTypesByFolder.getMimeTypes ( this , connection.request.uri ).TryGetValue ( ext , out contentTypeAndCharset ) )
+					
+					if ( MimeTypes.defaultMimeTypes.TryGetValue ( ext , out contentTypeAndCharset ) )
 					{
 						Stream reourceStream = null ;
 						try

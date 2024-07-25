@@ -62,6 +62,11 @@ namespace WebSockets
 						this [ "pathPrefix" ] = _pathPrefix = token.ToObject<string>() ;
 			}
 		}
+		/// <summary>
+		/// Returns method name by removing path prefix form the uri
+		/// </summary>
+		/// <param name="uri">Uri to exxtract method from</param>
+		/// <returns>Returns method name by removing path prefix form the uri</returns>
 		protected override string getMethodName ( Uri uri )
 		{
 			string methodName = uri.LocalPath ;
@@ -84,12 +89,12 @@ namespace WebSockets
 			get => _debugConfigData;
 		}
 		/// <summary>
-		/// Init new instance 
+		/// Loads new instance with data
 		/// </summary>
 		/// <param name="server">WebServer instance</param>
-		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
-		/// <param name="configData">(DebugHttpServiceData)</param>
-		public override void init ( WebServer server , HttpConnectionDetails connection , JObject configData )
+		/// <param name="connection">Connection data(IncomingHttpConnection)</param>
+		/// <param name="configData">Configuration data for the DebugHttpService</param>
+		public override void init ( WebServer server , IncomingHttpConnection connection , JObject configData )
 		{
 			if ( configData == null )
 				_debugConfigData = new DebugHttpServiceData () ;
@@ -103,7 +108,9 @@ namespace WebSockets
 		/// <summary>
 		/// Converts stream to string, replace and send as body and with "text/html, UTF-8" header
 		/// </summary>
-		/// <param name="stream">File or resource</param>
+		/// <param name="stream">File or resource straem</param>
+		/// <param name="noCache">Sends no-cache header when this is true</param>
+		/// <param name="responseHeader">Response header text</param>
 		protected virtual void RespondWithHtml ( Stream stream , bool noCache , out string responseHeader )
 		{
 			responseHeader = "" ;
@@ -149,35 +156,14 @@ namespace WebSockets
 		/// <param name="methodFound">Return true if method with name equal to value in methodName is found</param>
 		/// <param name="error">Code execution error(if any)</param>
 		/// <returns>Returns true if responded</returns>
-		public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out string methodName , out bool methodFound , out Exception error ) 
+		public override bool Respond ( out string responseHeader , out string methodName , out bool methodFound , out Exception error ) 
 		{
-			if ( base.Respond ( mimeTypesByFolder , out responseHeader , out methodName , out methodFound , out error ) ) return true ;
+			if ( base.Respond ( out responseHeader , out methodName , out methodFound , out error ) ) return true ;
 				
 			if ( error == null )
 				error = new ArgumentException ( methodFound ? 
 						( "Code method \"" + methodName + "\" does not responde to http " + connection.request.method + " method" ) :
 						( "Code method \"" + methodName + "\" not found" ) ) ;
-			//{
-			//	switch ( methodName.ToLower () ) 
-			//	{ 
-			//		case "/formtest.html" :
-			//		case "formtest.html" :
-						
-			//			return true ;
-			//		default:
-			//			error = new ArgumentException ( methodFound ? 
-			//					( "Code method \"" + methodName + "\" does not responde to http " + connection.request.method + " method" ) :
-			//					( "Code method \"" + methodName + "\" not found" ) ) ;
-			//		break ;
-			//	}
-			//}
-			//else if ( methodName == "" ) 
-			//{ 
-			//	RespondeWithDebugHtml ( error , out responseHeader ) ;
-			//	//error = null ;
-			//	//RespondWithHtml ( Assembly.GetExecutingAssembly().GetManifestResourceStream ( "WebSockets.Server.Http.FormTest.html" ) ) ;
-			//	return true ;
-			//}
 			RespondeWithDebugHtml ( error , out responseHeader ) ;
 			return true ;
 		}
@@ -327,7 +313,7 @@ namespace WebSockets
 			return memoryStream ;
 		}	
 		/// <summary>
-		/// Renders "&lt;html&gt;\r\n&lt;body&gt;\r\n" ) into string builder
+		/// Renders "&lt;html&gt;\r\n&lt;body&gt;\r\n"  into string builder
 		/// </summary>
 		public virtual void renderHtmlAndBodyStartTag ()
 		{

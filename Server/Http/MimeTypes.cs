@@ -16,6 +16,16 @@ namespace WebSockets
 	/// </summary>
     public class MimeTypes : Dictionary<string,MimeTypeAndCharset>
     {
+
+		/// <summary>
+		/// Creates a new default MimeType instance 
+		/// </summary>
+		internal MimeTypes ( )
+		{
+			fromDefaults = true ;
+			foreach ( KeyValuePair<string,string> keyValuePair in defaultMimeTypeValues )
+				this.Add ( keyValuePair.Key, new MimeTypeAndCharset ( keyValuePair.Value , "utf-8" ) ) ;
+		}
 		/// <summary>
 		/// Creates a new MimeType instance for the specified folder.
 		/// <br/>It first tries to load MimeTypes.config and then,if it fails, 
@@ -25,19 +35,19 @@ namespace WebSockets
 		/// <param name="folder">Existing file system folder</param>
 		/// <param name="httpService">HttpSerice needed to obtain xml/json resource stream</param>
 		/// <param name="requestedUri">Requested uri, not mime config file uri</param>
-		internal MimeTypes ( IHttpService httpService , Uri requestedUri ):this ( httpService , requestedUri.AbsolutePath ) 
+		internal MimeTypes ( Uri requestedUri , IHttpService httpService ):this ( requestedUri.AbsolutePath , httpService ) 
 		{
 		}
+
 		/// <summary>
 		/// Creates a new MimeType instance for the specified folder/path.
 		/// <br/>It first tries to load MimeTypes.config and then, if it fails, 
 		/// <br/>it tries to load MimeTypes.json and if that fails,
 		/// <br/>it will load the default values (MimeTypes.defaultMimeTypeValues)
 		/// </summary>
-		/// <param name="folder">Existing file system folder</param>
 		/// <param name="httpService">HttpSerice needed to obtain xml/json resource stream</param>
 		/// <param name="requestedPath">Requested path, not mime config file path </param>
-		internal MimeTypes ( IHttpService httpService , string requestedPath )
+		internal MimeTypes ( string requestedPath , IHttpService httpService )
 		{
 			int i = requestedPath.LastIndexOf ( '/' ) ;
 			if ( i != -1 ) requestedPath = requestedPath.Substring ( 0 , i + 1 ) ;
@@ -45,14 +55,9 @@ namespace WebSockets
 			fromDefaults = true ;
 			try
 			{
-				resourceStream = httpService.GetResourceStream ( new Uri ( "/" + requestedPath + "mimeTipe.xml" ) ) ;
-				if ( loadFromXml ( resourceStream ) )
-				{
-					resourceStream.Close () ;
-					resourceStream.Dispose () ;
-					return ;
-				}
-
+				resourceStream = httpService.GetResourceStream ( new Uri ( "/" + requestedPath + "mimeTypes.config" ) ) ;
+				
+				fromDefaults = !loadFromXml ( resourceStream ) ;
 			}
 			catch 
 			{ 
@@ -67,12 +72,13 @@ namespace WebSockets
 					resourceStream = null ;
 				}
 			}
-			try
-			{
-				resourceStream = httpService.GetResourceStream ( new Uri ( "/" + requestedPath + "mimeTipe.json" ) ) ;
-				fromDefaults = loadFromJson ( resourceStream ) ;
-			}
-			catch { }
+			if ( fromDefaults )
+				try
+				{
+					resourceStream = httpService.GetResourceStream ( new Uri ( "/" + requestedPath + "mimeTypes.json" ) ) ;
+					fromDefaults = !loadFromJson ( resourceStream ) ;
+				}
+				catch { }
 			if ( resourceStream != null )
 			{
 				try
@@ -96,73 +102,6 @@ namespace WebSockets
 			this.parent = parent ;
 			fromDefaults = false ;
 		}
-		///// <summary>
-		///// Creates a new MimeType instance for the specified folder.
-		///// <br/>It first tries to load MimeTypes.config and then,if it fails, 
-		///// <br/>it tries to load MimeTypes.json and if that fails,
-		///// <br/>it will load the default values (MimeTypes.defaultMimeTypeValues)
-		///// </summary>
-		///// <param name="folder">Existing file system folder</param>
-  //      internal MimeTypes ( string folder )
-  //      {
-		//	parent = null ;
-		//	fromDefaults = false ;
-  //          string configFileName = folder + @"\MimeTypes.config" ;
-		//	try
-		//	{
-		//		if ( File.Exists ( configFileName ) )
-		//		{
-		//			XmlDocument document = new XmlDocument() ;
-		//			document.Load ( configFileName ) ;
-		//			foreach ( XmlNode node in document.SelectNodes ( "configuration/system.webServer/staticContent/mimeMap" ) )
-		//				Add ( node.Attributes [ "fileExtension" ].Value , 
-		//					new MimeTypeAndCharset ( node.Attributes [ "mimeType" ].Value , node.Attributes [ "charset" ] == null ? "" : node.Attributes [ "charset" ].Value ) ) ;
-		//			return ;
-		//		}
-		//	}
-		//	catch 
-		//	{ 
-		//		Clear () ;
-		//	}
-		//	configFileName = folder + @"\MimeTypes.json" ;
-		//	//	[ { "extension": "html", "mimeType": "text/html" } , { "extension": "txt", "mimeType": "text/plain" } ...  ]
-
-		//	StreamReader reader = null ;
-		//	try
-		//	{
-		//		//JArray array = ( Newtonsoft.Json.Linq.JArray ) JsonConvert.DeserializeObject ( "[ { 'extension': 'html', 'mimeType': 'text/html' , 'charset' : 'utf-8' } , { 'extension': 'txt', 'mimeType': 'text/plain' } ]" ) ;  
-		//		if ( File.Exists ( configFileName ) )
-		//		{
-		//			reader = new StreamReader ( configFileName ) ;
-		//			foreach ( JObject item in ( Newtonsoft.Json.Linq.JArray ) JsonConvert.DeserializeObject ( reader.ReadToEnd () ) )
-		//			{
-		//				string key = item.Value<string> ( "extension" ) ;
-		//				if ( ( key != null ) && ContainsKey ( key ) )
-		//				{
-		//					string value = item.Value<string> ( "mimeType" ) ;
-		//					if ( value != null ) Add ( key , new MimeTypeAndCharset ( value , item.Value<string> ( "charset" ) ) ) ;
-		//				}
-		//			}
-		//			return ;
-		//		}
-		//	}
-		//	catch 
-		//	{ 
-		//		Clear () ;
-		//	}
-		//	try
-		//	{ 
-		//		if ( reader != null )
-		//		{
-		//			reader.Close () ;
-		//			reader.Dispose () ;
-		//		}
-		//	}
-		//	catch { }
-		//	fromDefaults = true ;
-		//	foreach ( KeyValuePair<string,string> keyValuePair in defaultMimeTypeValues )
-		//			this.Add ( keyValuePair.Key, new MimeTypeAndCharset ( keyValuePair.Value , "utf-8" ) ) ;
-  //      }
 		/// <summary>
 		/// Loads data from given xml stream
 		/// <param name="stream">Stream with xml text</param>
@@ -250,97 +189,13 @@ namespace WebSockets
 			stream.Dispose () ;
 			return mimeTypes ;
         }
-		///// <summary>
-		///// Creates a new MimeType instance for the specified resource(!) folder.
-		///// <br/>It first tries checks resources(!) for MimeTypes.config(xml) or MimeTypes.json and tries to load one of them,
-		///// <br/>if that fails it will load the default values (MimeTypes.defaultMimeTypeValues)
-		///// </summary>
-		///// <param name="requestedPath">Requested path</param>
-		///// <param name="folder">Like file system folder but folder separator is '.' instead '/'</param>
-  //      internal MimeTypes ( Assembly resourceAssembly , Dictionary<string, string> resourcePaths , string folder )
-  //      {
-		//	parent = null ;
-		//	fromDefaults = false ;
-		//	if ( folder == null )
-		//		folder = "" ;
-		//	else
-		//	{
-		//		folder = folder.Replace ( '/' , '.' ).ToLower () ;
-		//		if ( folder.Length > 1 )
-		//			if ( folder [ 0 ] == '.' ) folder = folder.Substring ( 1 ) ;
-		//	}
-			
-  //          string configFileName = folder + @"mimeTypes.config" ;
-		//	StreamReader reader = null ;
-		//	try
-		//	{
-		//		if ( resourcePaths.ContainsKey ( configFileName ) )
-		//		{
-		//			reader = new StreamReader ( resourceAssembly.GetManifestResourceStream ( resourcePaths [ configFileName ] ) ) ;
-		//			XmlDocument document = new XmlDocument() ;
-		//			document.LoadXml ( reader.ReadToEnd() ) ;
-		//			foreach ( XmlNode node in document.SelectNodes ( "configuration/system.webServer/staticContent/mimeMap" ) )
-		//				Add ( node.Attributes [ "fileExtension" ].Value , 
-		//					new MimeTypeAndCharset ( node.Attributes [ "mimeType" ].Value , node.Attributes [ "charset" ] == null ? "" : node.Attributes [ "charset" ].Value ) ) ;
-		//			reader.Close () ;
-		//			reader.Dispose () ;
-		//			return ;
-		//		}
-		//	}
-		//	catch 
-		//	{ 
-		//		Clear () ;
-		//	}
-		//	try
-		//	{
-		//		if ( reader != null )
-		//		{
-		//			reader.Close () ;
-		//			reader.Dispose () ;
-		//		}
-		//	}
-		//	catch { }
-		//	configFileName = folder + @"mimetypes.json" ;
-		//	//	[ { "extension": "html", "mimeType": "text/html" } , { "extension": "txt", "mimeType": "text/plain" } ...  ]
-
-		//	try
-		//	{
-		//		//JArray array = ( Newtonsoft.Json.Linq.JArray ) JsonConvert.DeserializeObject ( "[ { 'extension': 'html', 'mimeType': 'text/html' , 'charset' : 'utf-8' } , { 'extension': 'txt', 'mimeType': 'text/plain' } ]" ) ;  
-
-		//		if ( resourcePaths.ContainsKey ( configFileName ) )
-		//		{
-		//			reader = new StreamReader ( resourceAssembly.GetManifestResourceStream ( resourcePaths [ configFileName ] ) ) ;
-		//			foreach ( JObject item in ( Newtonsoft.Json.Linq.JArray ) JsonConvert.DeserializeObject ( reader.ReadToEnd () ) )
-		//			{
-		//				string key = item.Value<string> ( "extension" ) ;
-		//				if ( ( key != null ) && ContainsKey ( key ) )
-		//				{
-		//					string value = item.Value<string> ( "mimeType" ) ;
-		//					if ( value != null ) Add ( key , new MimeTypeAndCharset ( value , item.Value<string> ( "charset" ) ) ) ;
-		//				}
-		//			}
-		//			reader.Close () ;
-		//			reader.Dispose () ;
-		//			return ;
-		//		}
-		//	}
-		//	catch 
-		//	{ 
-		//		Clear () ;
-		//	}
-		//	try
-		//	{ 
-		//		if ( reader != null )
-		//		{
-		//			reader.Close () ;
-		//			reader.Dispose () ;
-		//		}
-		//	}
-		//	catch { }
-		//	fromDefaults = true ;
-		//	foreach ( KeyValuePair<string,string> keyValuePair in defaultMimeTypeValues )
-		//			this.Add ( keyValuePair.Key, new MimeTypeAndCharset ( keyValuePair.Value , "utf-8" ) ) ;
-  //      }
+		protected static MimeTypes _defaultMimeTypes ;
+		protected static MimeTypes getDefaultMimeTypes ()
+		{
+			if ( _defaultMimeTypes == null ) _defaultMimeTypes = new MimeTypes () ;
+			return _defaultMimeTypes ;
+		}
+		public static MimeTypes defaultMimeTypes => getDefaultMimeTypes () ;
 		public string ToJson ()
 		{
 			StringBuilder stringBuilder = new StringBuilder () ;
@@ -401,107 +256,8 @@ namespace WebSockets
 		}
 		
 
-		
-		
-		/*
-		/// <summary>
-		/// All already requested mime types are stored in this dictionary.
-		/// <br/>If a folder does not exists in the dictionary key list it means it has not been demaned yet.
-		/// <br/>If a folder exists in the dictionary but there are no mime types defined 
-		/// </summary>
-        private static Dictionary<string, MimeTypes> mimeTypesByFolder = new Dictionary<string, MimeTypes>();
 
-		/// <summary>
-		/// Returns extension/mime types dictionary(MimeTypes) for particular folder.<br/>
-		/// If there are no mime type defined for the requested folder then<br/>it will return MimeType instance with parent property
-		/// set to parent MimeType instance with real data.
-		/// </summary>
-		/// <param name="requestedPath">Requested path</param>
-		/// <returns>Returns MimeTypes for particular folder</returns>
-        public static MimeTypes getMimeTypes ( string webroot , Uri requestedUri )
-        {
-            MimeTypes mimeTypes = null ;
-            lock ( mimeTypesByFolder )
-            {
-				string requestedPath = requestedUri.AbsolutePath ;
-				int i = requestedPath.LastIndexOf ( '/' ) ;
-				if ( i != -1 ) requestedPath = requestedPath.Substring ( 0 , i + 1 ) ;
-                if ( !mimeTypesByFolder.TryGetValue ( requestedPath , out mimeTypes ) )
-                {
-					mimeTypes = new MimeTypes ( webroot + requestedPath ) ;  
-					if ( mimeTypes.fromDefaults ) //neighter MimeTypes.xml or MimeTypes.json found
-					{
-						i = requestedPath.LastIndexOf ( '/' ) ;
-						while ( i > 0 )
-						{
-							if ( mimeTypesByFolder.TryGetValue ( requestedPath.Substring ( 0 , i ) , out mimeTypes ) )
-							{
-								mimeTypes = new MimeTypes ( mimeTypes ) ;
-								mimeTypesByFolder.Add ( requestedPath , mimeTypes ) ;
-								break ;
-							}
-							else i = requestedPath.LastIndexOf ( '/' , i - 1 ) ;
-						}
-						if ( !mimeTypesByFolder.TryGetValue ( "" , out mimeTypes ) )
-						{
-							mimeTypes = new MimeTypes ( "" ) ;
-							mimeTypesByFolder.Add ( "" , mimeTypes ) ;
-						}
-						mimeTypes = new MimeTypes ( mimeTypes ) ;
-						mimeTypesByFolder.Add ( requestedPath , mimeTypes ) ;
-					}
-					else mimeTypesByFolder.Add ( requestedPath , mimeTypes ) ;
-                }
-            }
-            return mimeTypes ;
-        }
-		/// <summary>
-		/// Returns extension/mime types dictionary(MimeTypes) for particular resource folder.
-		/// If there are no mime types defined for the requested folder then 
-		/// </summary>
-		/// <param name="requestedPath">Requested path</param>
-		/// <param name="resourcePaths">Dictionary with lowcase file names for keys and full resource names for values.</param>
-		/// <param name="resourceAssembly">Assembly with resources to load data from, in this case mime definition file(MimeType.xml or MimeType.json)</param>
-		/// <returns>Returns MimeTypes for particular folder</returns>
-        public static MimeTypes getMimeTypes ( Assembly resourceAssembly , Dictionary<string, string> resourcePaths , Uri requestedUri )
-        {
-            MimeTypes mimeTypes = null ;
-            lock ( mimeTypesByFolder )
-            {
-				string requestedPath = requestedUri.AbsolutePath ;
-				int i = requestedPath.LastIndexOf ( '/' ) ;
-				if ( i != -1 ) requestedPath = requestedPath.Substring ( 0 , i + 1 ) ;
-                if ( !mimeTypesByFolder.TryGetValue ( requestedPath , out mimeTypes ) )
-                {
-					mimeTypes = new MimeTypes ( resourceAssembly , resourcePaths , requestedPath ) ;  
-					if ( mimeTypes.fromDefaults ) //neighter MimeTypes.xml or MimeTypes.json found
-					{
-						i = requestedPath.LastIndexOf ( '/' ) ;
-						while ( i > 0 )
-						{
-							if ( mimeTypesByFolder.TryGetValue ( requestedPath.Substring ( 0 , i ) , out mimeTypes ) )
-							{
-								mimeTypes = new MimeTypes ( mimeTypes ) ;
-								mimeTypesByFolder.Add ( requestedPath , mimeTypes ) ;
-								break ;
-							}
-							else i = requestedPath.LastIndexOf ( '/' , i - 1 ) ;
-						}
-						if ( !mimeTypesByFolder.TryGetValue ( "" , out mimeTypes ) )
-						{
-							mimeTypes = new MimeTypes ( "" ) ;
-							mimeTypesByFolder.Add ( "" , mimeTypes ) ;
-						}
-						mimeTypes = new MimeTypes ( mimeTypes ) ;
-						mimeTypesByFolder.Add ( requestedPath , mimeTypes ) ;
-					}
-					else mimeTypesByFolder.Add ( requestedPath , mimeTypes ) ;
-                }
-            }
-            return mimeTypes.parent == null ? mimeTypes : mimeTypes.parent ;
-        }
 		
-		*/
 		/// <summary>
 		/// Read only collection with default mime type values. Keys are filled with file extensions. 
 		/// </summary>
@@ -519,7 +275,7 @@ namespace WebSockets
 			protected set ;
 		}
 		/// <summary>
-		/// This is true if this instance is created from deafaul values, not loaded form disk, not connected to parent
+		/// This is true if this instance is created from deafaul values, not loaded from disk, not connected to parent
 		/// </summary>
 		public bool fromDefaults
 		{

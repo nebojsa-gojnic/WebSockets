@@ -16,7 +16,7 @@ namespace WebSockets
 		/// <param name="responseHeader">Resonse header</param>
 		/// <param name="error">Code execution error(if any)</param>
 		/// <returns>Should returns true if response is 400 and everything OK</returns>
-		bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception error ) ;
+		bool Respond ( out string responseHeader , out Exception error ) ;
 
 		/// <summary>
 		/// This method should return (file) stream to resource specified by the given uri<br/>
@@ -44,9 +44,9 @@ namespace WebSockets
 		/// </summary>
 		bool isDisposed { get ; } 
 		/// <summary>
-		/// Connection data(HttpConnectionDetails)
+		/// Connection data(IncomingHttpConnection)
 		/// </summary>
-		HttpConnectionDetails connection { get ; }
+		IncomingHttpConnection connection { get ; }
 
 
 		/// <summary>
@@ -64,9 +64,9 @@ namespace WebSockets
 		/// Init new instance 
 		/// </summary>
 		/// <param name="server">WebServer instance</param>
-		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="connection">Connection data(IncomingHttpConnection)</param>
 		/// <param name="configData">Anything</param>
-		void init ( WebServer server , HttpConnectionDetails connection , JObject configData ) ;
+		void init ( WebServer server , IncomingHttpConnection connection , JObject configData ) ;
 		
 		/// <summary>
 		/// checks

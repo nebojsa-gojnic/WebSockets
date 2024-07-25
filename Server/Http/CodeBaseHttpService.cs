@@ -21,12 +21,12 @@ namespace WebSockets
 		/// <param name="responseHeader">Resonse header</param>
 		/// <param name="error">Code execution error(if any)</param>
 		/// <returns>Returns true if responded</returns>
-		public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception error ) 
+		public override bool Respond ( out string responseHeader , out Exception error ) 
 		{
 			bool methodFound ;
 			string methodName ;
 			
-			if ( Respond ( mimeTypesByFolder , out responseHeader , out methodName , out methodFound , out error ) ) return true ;
+			if ( Respond ( out responseHeader , out methodName , out methodFound , out error ) ) return true ;
 			
 			if ( error == null )
 				error = new ArgumentException ( methodFound ? 
@@ -42,7 +42,7 @@ namespace WebSockets
 		/// <param name="methodFound">Return true if method with name equal to value in methodName is found</param>
 		/// <param name="error">Code execution error(if any)</param>
 		/// <returns>Returns true if responded</returns>
-		public virtual bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out string methodName , out bool methodFound , out Exception error ) 
+		public virtual bool Respond ( out string responseHeader , out string methodName , out bool methodFound , out Exception error ) 
 		{
 			methodName = getMethodName ( connection.request.uri ) ;
 			methodFound = false ;
@@ -196,7 +196,7 @@ namespace WebSockets
 		/// <br/>Keys are just name strings but values can be either
 		/// string or List&lt;string&gt;
 		/// </returns>
-		public static HttpFormParameterDictionary getQueryParameters ( HttpConnectionDetails connection )
+		public static HttpFormParameterDictionary getQueryParameters ( IncomingHttpConnection connection )
 		{
 			HttpRequest request = connection.request ;
 			if ( request.contentLength == -1 ) throw new ArgumentException ( "No \"Content-Length\" attribute in request heaer" ) ;

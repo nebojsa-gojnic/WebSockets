@@ -98,9 +98,9 @@ namespace WebSockets
 		/// Init new instance 
 		/// </summary>
 		/// <param name="server">WebServer instance</param>
-		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="connection">Connection data(IncomingHttpConnection)</param>
 		/// <param name="configData">(TestHttpServiceData)</param>
-		public override void init ( WebServer server , HttpConnectionDetails connection , JObject configData )
+		public override void init ( WebServer server , IncomingHttpConnection connection , JObject configData )
 		{
 			if ( configData == null )
 				_testHttpConfigData = new TestHttpServiceData ( ) ;
@@ -137,7 +137,7 @@ namespace WebSockets
 		/// <param name="responseHeader">Resonse header</param>
 		/// <param name="codeError">Code execution error(if any)</param>
 		/// <returns>Returns true if response is 400 and everything OK</returns>
-		public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError ) 
+		public override bool Respond ( out string responseHeader , out Exception codeError ) 
 		{
 			responseHeader = "" ;
 			codeError = null ;

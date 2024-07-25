@@ -79,7 +79,7 @@ namespace WebSockets
 		/// </summary>
 		/// <param name="path">Real path uri</param>
 		/// <returns>Returns null or real type for IHttpService instance.</returns>
-		public virtual IHttpService createService ( WebServer server , HttpConnectionDetails connection )
+		public virtual IHttpService createService ( WebServer server , IncomingHttpConnection connection )
 		{
 			string path = connection.request.uri.LocalPath ;
 			int i = path.IndexOf ( '?' ) ;

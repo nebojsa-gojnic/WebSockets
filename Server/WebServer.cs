@@ -23,6 +23,24 @@ namespace WebSockets
     public class WebServer : IDisposable
     {
 		/// <summary>
+		/// Auxiliary variable for the mimeTypeDictionary property
+		/// </summary>
+		protected MimeTypeDictionary _mimeTypeDictionary ;
+		/// <summary>
+		/// Get method for the mimeTypeDictionary property
+		/// </summary>
+		/// <returns>Returns value for the mimeTypeDictionary property</returns>
+		public MimeTypeDictionary getMimeTypeDictionary ()
+		{
+			if ( _mimeTypeDictionary == null ) _mimeTypeDictionary = new MimeTypeDictionary () ;
+			return _mimeTypeDictionary  ;
+		}
+		/// <summary>
+		/// Mime types cashe
+		/// </summary>
+		public MimeTypeDictionary mimeTypeDictionary => getMimeTypeDictionary() ;
+
+		/// <summary>
 		/// maintain a list of open connections so that we can notify the client if the server shuts down
 		/// </summary>
         private readonly List<IDisposable> _openConnections ;
@@ -72,13 +90,13 @@ namespace WebSockets
 		{
 			return pathManager [ path ] ;
 		}
-		/// <summary>
-		/// All already requested mime types are stored in this dictionary.
-		/// <br/>If a folder does not exists in the dictionary key list it means it has not been demaned yet.
-		/// <br/>If folder exists in the dictionary but there are no mime types file then parent mime type definition will be used.
-		/// <br/>It there are no root folder mime definition file then default mime types will be used(see MimeTypes.getDefaultMimeTypeValues())
-		/// </summary>
-        private MimeTypeDictionary mimeTypesByFolder ;
+		///// <summary>
+		///// All already requested mime types are stored in this dictionary.
+		///// <br/>If a folder does not exists in the dictionary key list it means it has not been demaned yet.
+		///// <br/>If folder exists in the dictionary but there are no mime types file then parent mime type definition will be used.
+		///// <br/>It there are no root folder mime definition file then default mime types will be used(see MimeTypes.getDefaultMimeTypeValues())
+		///// </summary>
+  //      private MimeTypeDictionary mimeTypesByFolder ;
 		/// <summary>
 		/// SSL certificate
 		/// </summary>
@@ -99,8 +117,8 @@ namespace WebSockets
 		protected EventHandler _disposed ;
 		protected EventHandler _started ;
 		protected EventHandler _stoped ;
-		protected EventHandler<HttpConnectionDetails> _connectionErrorRaised ;
-		protected EventHandler<HttpConnectionDetails> _serviceErrorRaised ;
+		protected EventHandler<IncomingHttpConnection> _connectionErrorRaised ;
+		protected EventHandler<IncomingHttpConnection> _serviceErrorRaised ;
 		public bool isListening 
 		{
 			get ;
@@ -116,11 +134,11 @@ namespace WebSockets
 		{
 		}
         public WebServer ( 
-						EventHandler<HttpConnectionDetails> clientConnectedEventHandler , 
-						EventHandler<HttpConnectionDetails> serverRespondedEventHandler ,
+						EventHandler<IncomingHttpConnection> clientConnectedEventHandler , 
+						EventHandler<IncomingHttpConnection> serverRespondedEventHandler ,
 						EventHandler startedEventHandle , EventHandler stopedEventHandle , 
-						EventHandler<HttpConnectionDetails> connectionErrorEventHandler , 
-						EventHandler<HttpConnectionDetails> serviceErrorEventHandler ,
+						EventHandler<IncomingHttpConnection> connectionErrorEventHandler , 
+						EventHandler<IncomingHttpConnection> serviceErrorEventHandler ,
 						EventHandler disposedEventHandler )
         {
 			pathManager = new PathManager () ;
@@ -134,7 +152,6 @@ namespace WebSockets
 			_connectionErrorRaised = connectionErrorEventHandler ;
 			_serviceErrorRaised = serviceErrorEventHandler  ;
 			isListening = false ;
-			mimeTypesByFolder = new MimeTypeDictionary () ;
         }
 		/// <summary>
 		/// Auxiliary variable for the port property
@@ -188,7 +205,7 @@ namespace WebSockets
 			catch ( Exception x )
 			{
 				error = x ;
-				_serviceErrorRaised?.Invoke ( this , new HttpConnectionDetails ( x ) ) ;
+				_serviceErrorRaised?.Invoke ( this , new IncomingHttpConnection ( x ) ) ;
 				_stoped?.Invoke ( this , new EventArgs () ) ;
 			}
 			if ( error != null ) throw ( error ) ;
@@ -216,7 +233,7 @@ namespace WebSockets
 		
         private void HandleAsyncConnection ( IAsyncResult result )
         {
-			HttpConnectionDetails connectionDetails = null ;
+			IncomingHttpConnection connectionDetails = null ;
             try
             {
                 
@@ -230,7 +247,7 @@ namespace WebSockets
                     // we are ready to listen for more connections (on another thread)
 					if ( _isDisposed ) return ;
 					if ( isListening ) StartAccept() ; //!!!
-					connectionDetails = new HttpConnectionDetails ( tcpClient , sslCertificate , sslProtocol ) ;
+					connectionDetails = new IncomingHttpConnection ( tcpClient , sslCertificate , sslProtocol ) ;
                     //_logger?.Information ( GetType() , "Server: Connection opened" ) ;
 
                     // get a secure or insecure stream
@@ -255,7 +272,7 @@ namespace WebSockets
 						{
 							service = new BadRequestService () ;
 							service.init ( this , connectionDetails , new JObject () ) ;
-							_connectionErrorRaised?.Invoke ( this , new HttpConnectionDetails ( connectionDetails , 
+							_connectionErrorRaised?.Invoke ( this , new IncomingHttpConnection ( connectionDetails , 
 								createServiceException == null ?
 								new SerializationException ( "No path match \"" + connectionDetails.request.uri.LocalPath + "\"" ) :
 								createServiceException ) ) ;						
@@ -271,7 +288,7 @@ namespace WebSockets
 							// Take a look at the WebSocketConnection or HttpConnection classes
 							string responseHeader ;
 							Exception error ;
-							service.Respond ( mimeTypesByFolder , out responseHeader , out error ) ;
+							service.Respond ( out responseHeader , out error ) ;
 							connectionDetails.responseHeader = responseHeader ;
 							connectionDetails.error = error ;
 							_serverResponded?.Invoke ( this , connectionDetails ) ;
@@ -304,21 +321,21 @@ namespace WebSockets
 				{
 					try
 					{
-						_serviceErrorRaised?.Invoke ( this , connectionDetails == null ? new HttpConnectionDetails ( ex ) : connectionDetails ) ;
+						_serviceErrorRaised?.Invoke ( this , connectionDetails == null ? new IncomingHttpConnection ( ex ) : connectionDetails ) ;
 					}
 					catch { }
 					Stop ( true ) ;
 				}
             }
         }
-		protected EventHandler<HttpConnectionDetails> _clientConnected ;
-		public event EventHandler<HttpConnectionDetails> clientConnected 
+		protected EventHandler<IncomingHttpConnection> _clientConnected ;
+		public event EventHandler<IncomingHttpConnection> clientConnected 
 		{
 			add => _clientConnected += value ;	
 			remove => _clientConnected -= value ;
 		}
-		protected EventHandler<HttpConnectionDetails> _serverResponded;
-		public event EventHandler<HttpConnectionDetails> serverResponded 
+		protected EventHandler<IncomingHttpConnection> _serverResponded;
+		public event EventHandler<IncomingHttpConnection> serverResponded 
 		{
 			add => _serverResponded += value ;	
 			remove => _serverResponded -= value ;
@@ -354,12 +371,12 @@ namespace WebSockets
 			add => _stoped+= value ;
 			remove => _stoped -= value ;
 		}
-		public event EventHandler<HttpConnectionDetails> connectionErrorRaised 
+		public event EventHandler<IncomingHttpConnection> connectionErrorRaised 
 		{
 			add => _connectionErrorRaised += value ;
 			remove => _connectionErrorRaised -= value ;
 		}
-		public event EventHandler<HttpConnectionDetails> serviceErrorRaised 
+		public event EventHandler<IncomingHttpConnection> serviceErrorRaised 
 		{
 			add => _serviceErrorRaised += value ;
 			remove => _serviceErrorRaised -= value ;
@@ -376,7 +393,7 @@ namespace WebSockets
 
 		public bool Stop ( bool killConnections )
 		{
-			mimeTypesByFolder.Clear () ;//!!!
+			//mimeTypesByFolder.Clear () ;//!!!
 			if ( isListening )
 			{
 				isListening = false ;

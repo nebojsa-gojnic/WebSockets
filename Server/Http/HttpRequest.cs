@@ -84,15 +84,15 @@ namespace WebSockets
 		/// <summary>
 		/// Creates new instance of HttpRequestData
 		/// </summary>
-		/// <param name="connection">HttpConnectionDetails instance with header string</param>
-		public HttpRequest ( HttpConnectionDetails connection ):this ( connection.sslCertificate != null , connection.stream )
+		/// <param name="connection">IncomingHttpConnection instance with header string</param>
+		public HttpRequest ( IncomingHttpConnection connection ):this ( connection.sslCertificate != null , connection.stream )
 		{
 
 		}
 		/// <summary>
 		/// Creates new instance of HttpRequestData
 		/// </summary>
-		/// <param name="connection">HttpConnectionDetails instance with header string</param>
+		/// <param name="connection">IncomingHttpConnection instance with header string</param>
 		public HttpRequest ( Uri uri )
 		{
 			this.uri = uri ;

@@ -86,7 +86,7 @@ namespace WebSockets
 		public PathDefinition ( string path , bool noSubPaths , int severity )
 		{
 			_noSubPaths = noSubPaths ;
-			if ( path == null ) throw new ArgumentNullException ( "path" ) ;
+			if ( string.IsNullOrWhiteSpace ( path ) ) throw new ArgumentNullException ( "path" ) ;
 			_path = path ;
 			_severity = severity ;
 			if ( _noSubPaths )
@@ -94,9 +94,12 @@ namespace WebSockets
 				_search = null ;
 				segments = ( path.IndexOf ( '*' ) == -1 ) && ( path.IndexOf ( '?' ) == -1 ) ? null : getPathSegments ( path ) ;
 			}
-			else if (  _path.LastIndexOf ( '/' ) == _path.Length - 1 ) 
-				_search = new Regex ( ( _path.Replace ( "*" , ".*" ).Replace ( "?" , "[^\\.]" ) + ".*" ) , RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled ) ;
-			else _search = ( ( _path.IndexOf ( '*' ) == -1 ) && ( _path.IndexOf ( '?' ) == -1 ) ) ? null : new Regex ( _path.Replace ( "*" , ".*" ).Replace ( "?" , "[^\\.]" ) , RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled ) ;
+			else 
+				_search = _path [ _path.Length - 1 ] == '/' ?
+					new Regex ( ( _path.Replace ( "*" , ".*" ).Replace ( "?" , "[^\\.]" ) + ".*" ) , RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled ) :
+						( ( _path.IndexOf ( '*' ) == -1 ) && ( _path.IndexOf ( '?' ) == -1 ) ) ? 
+							null : 
+							new Regex ( _path.Replace ( "*" , ".*" ).Replace ( "?" , "[^\\.]" ) , RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled ) ;
 		}
 		public static PathSegment[] getPathSegments ( string path )
 		{

@@ -95,9 +95,9 @@ namespace WebSockets
 		/// Init new instance 
 		/// </summary>
 		/// <param name="server">WebServer instance</param>
-		/// <param name="connection">Connection data(HttpConnectionDetails)</param>
+		/// <param name="connection">Connection data(IncomingHttpConnection)</param>
 		/// <param name="configData">(FileHttpServiceData)</param>
-		public override void init ( WebServer server, HttpConnectionDetails connection , JObject configData )
+		public override void init ( WebServer server, IncomingHttpConnection connection , JObject configData )
 		{
 			if ( configData == null )
 				_fileConfigData = new FileHttpServiceData () ;
@@ -142,8 +142,8 @@ namespace WebSockets
 		/// <param name="responseHeader">Resonse header</param>
 		/// <param name="error">Code execution error(if any)</param>
 		/// <returns>Should returns true if response is 400 and everything OK</returns>
-        public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
-        {
+        public override bool Respond ( out string responseHeader , out Exception codeError )
+		{
 			responseHeader = "" ;
 			codeError = null ;
 			FileStream fileStream = null ;
@@ -160,10 +160,15 @@ namespace WebSockets
 				// default to index.html is path is supplied
 				if ( IsDirectory ( fullFileNamePath ) ) 
 				{
-					if ( File.Exists ( fullFileNamePath + "default.html" ) ) 
-						fullFileNamePath += "default.html" ;
-					else // if ( File.Exists ( fullFileNamePath + "index.html" ) ) 
-						fullFileNamePath += "index.html" ;
+					if ( File.Exists ( Path.Combine ( fullFileNamePath , "default.html" ) ) ) 
+						fullFileNamePath = Path.Combine ( fullFileNamePath , "default.html" ) ;
+					else if ( File.Exists ( Path.Combine ( fullFileNamePath , "index.html" ) ) ) 
+						fullFileNamePath = Path.Combine ( fullFileNamePath , "index.html" ) ;
+					else 
+					{
+						responseHeader = RespondNotFoundFailure ( fullFileNamePath );
+						return true ;
+					}
 				}
 
 
@@ -172,10 +177,9 @@ namespace WebSockets
 					string ext = "" ;
 					i = fullFileNamePath.LastIndexOf ( '.' ) + 1 ;
 					if ( ( i != 0 ) && ( i < fullFileNamePath.Length ) ) ext = fullFileNamePath.Substring ( i ) ;
-
 					MimeTypeAndCharset contentTypeAndCharset ;
 					
-					if ( mimeTypesByFolder.getMimeTypes ( this , connection.request.uri ).TryGetValue ( ext , out contentTypeAndCharset ) )
+					if ( server.mimeTypeDictionary.tryGetMimeTypeAndCharset ( this , fullFileNamePath , out contentTypeAndCharset ) )
 					{
 						
 						//Byte[] bytes = File.ReadAllBytes ( fullFileNamePath ) ;
@@ -198,12 +202,11 @@ namespace WebSockets
 						connection.tcpClient.Client.Shutdown ( SocketShutdown.Send ) ; //??? why did I do this?
 						fileStream.Close () ;
 						fileStream.Dispose () ;
-						return true ;
 					}
 					else responseHeader = RespondMimeTypeFailure ( fullFileNamePath );
 				}
-				else responseHeader = RespondNotFoundFailure ( fullFileNamePath );
-
+				else responseHeader = RespondNotFoundFailure ( fullFileNamePath ) ;
+				return true ;
 			}
 			catch ( Exception x )
 			{
@@ -231,14 +234,6 @@ namespace WebSockets
 			{
 				queryString = i < fullFileNamePath.Length - 1 ? fullFileNamePath.Substring ( i + 1 ) : "" ;
 				fullFileNamePath = fullFileNamePath.Substring ( 0 , i ) ;
-			}
-			// default to index.html is path is supplied
-			if ( IsDirectory ( fullFileNamePath ) ) 
-			{
-				if ( File.Exists ( fullFileNamePath + "default.html" ) ) 
-					fullFileNamePath += "default.html" ;
-				else // if ( File.Exists ( fullFileNamePath + "index.html" ) ) 
-					fullFileNamePath += "index.html" ;
 			}
 			return File.OpenRead ( fullFileNamePath ) ; 
 		}

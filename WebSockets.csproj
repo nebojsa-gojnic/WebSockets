@@ -92,7 +92,7 @@
     <Compile Include="Server\ErrorAndUriEventArgs.cs" />
     <Compile Include="Server\Http\BadRequestService.cs" />
     <Compile Include="Server\Http\FileHttpService.cs" />
-    <Compile Include="Server\Http\HttpConnectionDetails.cs" />
+    <Compile Include="Server\Http\IncomingHttpConnection.cs" />
     <Compile Include="Server\Http\HttpServiceBase.cs" />
     <Compile Include="Server\Http\IHttpService.cs" />
     <Compile Include="Server\Http\MimeTypeAndCharset.cs" />

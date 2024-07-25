@@ -18,7 +18,7 @@ namespace WebSockets
 		/// <param name="responseHeader">"HTTP/1.1 400 Bad Request"</param>
 		/// <param name="codeError">Probably null</param>
 		/// <returns>Always false</returns>
-        public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
+        public override bool Respond ( out string responseHeader , out Exception codeError )
         {
 			codeError = null ;
 			responseHeader = RespondFailure ( "HTTP/1.1 400 Bad Request" , "" ) ;

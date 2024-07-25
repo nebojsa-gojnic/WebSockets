@@ -18,7 +18,7 @@ namespace WebSockets
 		
 
 		
-        public override bool Respond ( MimeTypeDictionary mimeTypesByFolder , out string responseHeader , out Exception codeError )
+        public override bool Respond ( out string responseHeader , out Exception codeError )
         {
 			responseHeader = "" ; 
 			codeError = null ;

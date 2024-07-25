@@ -68,9 +68,9 @@ namespace WebSockets
 		/// Creates new service for the given server and connection
 		/// </summary>
 		/// <param name="server">(WebServer)</param>
-		/// <param name="connection">(HttpConnectionDetails)</param>
+		/// <param name="connection">(IncomingHttpConnection)</param>
 		/// <returns></returns>
-		public IHttpService create ( WebServer server , HttpConnectionDetails connection )
+		public IHttpService create ( WebServer server , IncomingHttpConnection connection )
 		{
 			IHttpService service = ( IHttpService ) Activator.CreateInstance ( serviceType ) ;
 			service.init ( server , connection , configData ) ;
@@ -80,7 +80,7 @@ namespace WebSockets
 		/// Creates new service for the given server and connection
 		/// </summary>
 		/// <param name="server">(WebServer)</param>
-		/// <param name="connection">(HttpConnectionDetails)</param>
+		/// <param name="connection">(IncomingHttpConnection)</param>
 		/// <returns></returns>
 		public bool check ( WebServer server , out Exception exception  )
 		{
