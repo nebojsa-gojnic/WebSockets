@@ -12,7 +12,7 @@ namespace WebSockets
     {
 
 		/// <summary>
-		/// Responds with "HTTP/1.1 400 Bad Request"  ;
+		/// Responds with "HTTP/1.1 400 Bad Request" ;
 		/// </summary>
 		/// <param name="mimeTypesByFolder">Not used</param>
 		/// <param name="responseHeader">"HTTP/1.1 400 Bad Request"</param>
